@@ -205,7 +205,7 @@ class OSBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, **kwargs):
         super(OSBlock, self).__init__()
-        mid_channels = out_channels // 4
+        mid_channels = out_channels // 4   #// 연산자는 Python에서 **정수 나눗셈 (floor division)**을 수행하는 연산자입니다.
         self.conv1 = Conv1x1(in_channels, mid_channels)
         self.conv2a = LightConv3x3(mid_channels, mid_channels)
         self.conv2b = nn.Sequential(

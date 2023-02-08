@@ -1,0 +1,2 @@
+트레이닝  명령어
+python scripts/main.py --config-file configs/im_osnet_ibn_x1_0_softmax_256x128_amsgrad.yaml --transforms random_flip random_erase -s market1501 -t market1501 --root Market-1501-v15.09.15

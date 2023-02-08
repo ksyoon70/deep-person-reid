@@ -210,6 +210,18 @@ class ImageDataManager(DataManager):
         self._num_train_pids = trainset.num_train_pids
         self._num_train_cams = trainset.num_train_cams
 
+        """
+        torch.utils.data.DataLoader는 PyTorch에서 데이터를 로드하고, 이를 모델에 전달하기 위한 효율적인 방법을 제공하는 클래스입니다. 이 함수는 데이터셋을 쉽게 반복(iterate)할 수 있도록 여러 유용한 기능을 제공합니다. 주로 Dataset 객체와 함께 사용되며, 배치(batch) 처리, 셔플(shuffle), 병렬 처리 등을 지원합니다.
+        
+        주요 인자
+        dataset: Dataset 객체를 받으며, 모델에 전달할 데이터셋을 지정합니다.
+        batch_size: 한 번에 모델로 전달할 샘플의 수를 지정합니다.
+        shuffle: True로 설정하면, 에포크마다 데이터를 무작위로 섞습니다.
+        num_workers: 데이터를 로드할 때 사용할 병렬 작업자(worker) 수를 지정합니다.
+        sampler: 데이터의 서브셋을 선택하거나 특정 샘플링 전략을 적용하는데 사용됩니다.
+        pin_memory: True로 설정하면, 데이터 로드 속도를 높이기 위해 페이지 잠금 메모리를 사용합니다.
+        drop_last: 배치 크기로 나누었을 때 남는 샘플이 있는 경우, 이를 버릴지(drop) 여부를 결정합니다.
+        """
         self.train_loader = torch.utils.data.DataLoader(
             trainset,
             sampler=build_train_sampler(
