@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [     
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--config-file", "configs/im_r18_softmax_128x64_amsgrad.yaml",
+                "--transforms", "random_flip", "random_erase",
+                "-s", "market1501",
+                "-t", "market1501",
+                "--root", "Market-1501-v15.09.15"
+            ]
+        }
+    ]
+}

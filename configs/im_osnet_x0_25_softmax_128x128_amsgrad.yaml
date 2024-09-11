@@ -6,11 +6,11 @@ data:
   type: 'image'
   sources: ['market1501']
   targets: ['market1501']
-  height: 256
+  height: 128
   width: 128
   combineall: False
   transforms: ['random_flip']
-  save_dir: 'log/osnet_x0_25_market1501_softmax'
+  save_dir: 'log/osnet_x0_25_128x128_market1501_softmax'
 
 loss:
   name: 'softmax'

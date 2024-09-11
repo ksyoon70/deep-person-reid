@@ -1,16 +1,16 @@
 model:
-  name: 'osnet_x0_25'
+  name: 'mobilenetv2_x1_0'
   pretrained: True
 
 data:
   type: 'image'
   sources: ['market1501']
   targets: ['market1501']
-  height: 256
+  height: 128
   width: 128
   combineall: False
   transforms: ['random_flip']
-  save_dir: 'log/osnet_x0_25_market1501_softmax'
+  save_dir: 'log/mobilenetv2_x1_0_market1501_softmax'
 
 loss:
   name: 'softmax'
@@ -19,16 +19,16 @@ loss:
 
 train:
   optim: 'amsgrad'
-  lr: 0.003
-  max_epoch: 100
-  batch_size: 128
-  fixbase_epoch: 10
-  open_layers: ['classifier']
+  lr: 0.0003
+  max_epoch: 40
+  batch_size: 32
+  fixbase_epoch: 0
+  open_layers: []
   lr_scheduler: 'single_step'
-  stepsize: [80]
+  stepsize: [20]
 
 test:
-  batch_size: 300
+  batch_size: 100
   dist_metric: 'euclidean'
   normalize_feature: False
   evaluate: False
