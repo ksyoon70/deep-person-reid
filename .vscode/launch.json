@@ -8,11 +8,15 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "--config-file", "configs/im_osnet_x1_0_softmax_128x128_amsgrad.yaml",
+                "--config-file", "configs/im_osnet_x1_0_softmax_256x128_amsgrad_veri.yaml",
                 "--transforms", "random_flip", "random_erase",
-                "-s", "market1501",
-                "-t", "market1501",
-                "--root", "Market-1501-v15.09.15"
+                "-s", "veri",
+                "-t", "veri",
+                "--root", "VeRi",
+                "--result", "VeRi/veri/results",
+                "--color_label", "VeRi/veri/list_color.txt",
+                "--type_label", "VeRi/veri/list_type.txt",
+                "model.load_weights", "log/osnet_x1_0_veri_softmax/model/model.pth.tar-30"
             ]
         }
     ]

@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 import torchreid
+from torchreid.data.vehicle_datamanager import VehicleImageDataManager
 from torchreid.utils import (
     Logger, check_isfile, set_random_seed, collect_env_info,
     resume_from_checkpoint, load_pretrained_weights, compute_model_complexity
@@ -19,7 +20,10 @@ from default_config import (
 
 def build_datamanager(cfg):
     if cfg.data.type == 'image':
-        return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
+        if cfg.data.root == 'VeRi':  # VeRi 데이터셋인 경우
+            return torchreid.data.VehicleImageDataManager(**imagedata_kwargs(cfg))
+        else:
+            return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
     else:
         return torchreid.data.VideoDataManager(**videodata_kwargs(cfg))
 
@@ -47,8 +51,14 @@ def load_model(cfg, datamanager):
 def inference(cfg, model, datamanager):
     # You can implement the inference logic here based on your requirements
     # For example, you can loop through the test data and perform forward passes
-    query_loader = datamanager.test_loader['query']
-    gallery_loader = datamanager.test_loader['gallery']
+    targets = list(datamanager.test_loader.keys())
+
+    for name in targets:
+        domain = 'source' if name in datamanager.sources else 'target'
+        print('##### Evaluating {} ({}) #####'.format(name, domain))
+        query_loader = datamanager.test_loader[name]['query']
+        gallery_loader = datamanager.test_loader[name]['gallery']
+        break
 
     # Extract features for query images
     query_features, query_pids, query_camids = torchreid.utils.extract_features(

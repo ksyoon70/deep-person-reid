@@ -140,3 +140,4 @@ saved-models/
 model-zoo/
 debug*
 Market-1501-v15.09.15/
+VeRi/veri/*.jpg

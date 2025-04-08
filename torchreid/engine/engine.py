@@ -445,7 +445,12 @@ class Engine(object):
     def parse_data_for_train(self, data):
         imgs = data['img']
         pids = data['pid']
-        return imgs, pids
+        if self.datamanager.targets[0] == 'veri':
+            colors = data['color_id']
+            typeids = data['type_id']
+            return imgs, pids, colors, typeids
+        else:
+            return imgs, pids
 
     def parse_data_for_eval(self, data):
         imgs = data['img']

@@ -19,7 +19,10 @@ from default_config import (
 
 def build_datamanager(cfg):
     if cfg.data.type == 'image':
-        return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
+        if cfg.data.root == 'VeRi':
+            return torchreid.data.VehicleImageDataManager(**imagedata_kwargs(cfg))
+        else:
+            return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
     else:
         return torchreid.data.VideoDataManager(**videodata_kwargs(cfg))
 
@@ -154,7 +157,7 @@ def main():
     print('Building model: {}'.format(cfg.model.name))
     model = torchreid.models.build_model(
         name=cfg.model.name,
-        num_classes=datamanager.num_train_pids,
+        num_classes= (datamanager.num_train_pids + datamanager.num_train_color_ids + datamanager.num_train_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
         loss=cfg.loss.name,
         pretrained=cfg.model.pretrained,
         use_gpu=cfg.use_gpu
