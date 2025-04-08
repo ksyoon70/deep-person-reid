@@ -132,7 +132,7 @@ def main():
     cfg = get_default_config()
     cfg.use_gpu = torch.cuda.is_available()
     if args.config_file:
-        cfg.merge_from_file(args.config_file)
+        cfg.merge_from_file(args.config_file) # load values from a file
     reset_config(cfg, args)
     cfg.merge_from_list(args.opts)
     set_random_seed(cfg.train.seed)

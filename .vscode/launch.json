@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "--config-file", "configs/im_r18_softmax_128x64_amsgrad.yaml",
+                "--config-file", "configs/im_osnet_x1_0_softmax_128x128_amsgrad.yaml",
                 "--transforms", "random_flip", "random_erase",
                 "-s", "market1501",
                 "-t", "market1501",
