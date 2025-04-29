@@ -86,6 +86,7 @@ class Engine(object):
                 },
                 osp.join(save_dir, name),
                 is_best=is_best
+                #remove_module_from_keys = True
             )
 
     def set_model_mode(self, mode='train', names=None):
@@ -361,6 +362,7 @@ class Engine(object):
         def _feature_extraction(data_loader):
             f_, pids_, camids_ = [], [], []
             for batch_idx, data in enumerate(data_loader):
+
                 imgs, pids, camids = self.parse_data_for_eval(data)
                 if self.use_gpu:
                     imgs = imgs.cuda()
@@ -374,7 +376,7 @@ class Engine(object):
             f_ = torch.cat(f_, 0)
             pids_ = np.asarray(pids_)
             camids_ = np.asarray(camids_)
-            return f_, pids_, camids_
+            return f_, pids_, camids_,
 
         print('Extracting features from query set ...')
         qf, q_pids, q_camids = _feature_extraction(query_loader)

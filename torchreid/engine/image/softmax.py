@@ -5,6 +5,8 @@ from torchreid.losses import CrossEntropyLoss
 
 from ..engine import Engine
 
+import numpy as np
+import matplotlib.pyplot as plt
 
 class ImageSoftmaxEngine(Engine):
     r"""Softmax-loss engine for image-reid.
@@ -80,15 +82,32 @@ class ImageSoftmaxEngine(Engine):
             imgs, pids,colors, typeids = self.parse_data_for_train(data)
         else:
             imgs, pids = self.parse_data_for_train(data)
-
+        """
+        # interactive 모드 켜기 (윈도우 하나만 띄워놓고 갱신)
+        plt.ion()
+        # 1) 한 번만 Figure와 Axes 생성
+        fig, ax = plt.subplots()
+        arr = np.array(imgs[0])
+        arr_hwc = np.transpose(arr, (1, 2, 0))  # (H, W, C)로 변경
+        # 2) 이전 이미지를 지우고
+        ax.clear()
+        # 3) 새로운 이미지를 그리기
+        ax.imshow(arr_hwc)
+        ax.set_title(f"Frame {data['impath'][0]}")
+        # 4) 화면 갱신
+        fig.canvas.draw()
+        plt.pause(0.1)       # 잠깐 멈춰줘야 갱신이 화면에 반영됨
+        """
         if self.use_gpu:
             imgs = imgs.cuda()
             pids = pids.cuda()
             if self.datamanager.targets[0] == 'veri':
                 colors = colors.cuda()
                 typeids = typeids.cuda()
-
         outputs = self.model(imgs)
+        if hasattr(self.model.module, 'classifier'):
+            model_dict = self.model.state_dict()
+            #print('model_dict[module.classifier.weight][0,0:5] :{}'.format(model_dict['module.classifier.weight'][0,0:5]))
         
         if self.datamanager.targets[0] == 'veri':
             # 모델 결과(outputs)가 (batch_size, 594)라고 가정

@@ -1,9 +1,5 @@
-1 sedan
-2 suv
-3 van
-4 hatchback
-5 mpv
-6 pickup
-7 bus
-8 truck
-9 estate
+car			1
+truck		2
+bus			3
+motorcycle	4
+human		5

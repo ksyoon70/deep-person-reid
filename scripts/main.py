@@ -8,14 +8,14 @@ import torch.nn as nn
 import torchreid
 from torchreid.utils import (
     Logger, check_isfile, set_random_seed, collect_env_info,
-    resume_from_checkpoint, load_pretrained_weights, compute_model_complexity
+    resume_from_checkpoint, load_pretrained_weights,load_checkpoint ,compute_model_complexity
 )
 
 from default_config import (
     imagedata_kwargs, optimizer_kwargs, videodata_kwargs, engine_run_kwargs,
     get_default_config, lr_scheduler_kwargs
 )
-
+from collections import OrderedDict
 
 def build_datamanager(cfg):
     if cfg.data.type == 'image':
@@ -162,6 +162,7 @@ def main():
         pretrained=cfg.model.pretrained,
         use_gpu=cfg.use_gpu
     )
+
     num_params, flops = compute_model_complexity(
         model, (1, 3, cfg.data.height, cfg.data.width)
     )
@@ -169,6 +170,7 @@ def main():
 
     if cfg.model.load_weights and check_isfile(cfg.model.load_weights):
         load_pretrained_weights(model, cfg.model.load_weights)
+
 
     if cfg.use_gpu:
         model = nn.DataParallel(model).cuda()

@@ -6,12 +6,15 @@
 
 import glob
 import os
+import sys
 import os.path as osp
 import re
 from lxml import etree
 from torchreid.utils import read_image
 from ..dataset import ImageDataset
-
+import numpy as np
+import matplotlib.pyplot as plt
+import json
 class VeRi(ImageDataset):
     """VeRi.
 
@@ -38,9 +41,13 @@ class VeRi(ImageDataset):
         self.train_dir = osp.join(self.dataset_dir, 'image_train')
         self.query_dir = osp.join(self.dataset_dir, 'image_query')
         self.gallery_dir = osp.join(self.dataset_dir, 'image_test')
-
-        self.train_xml_file = osp.join(self.dataset_dir, self.train_xml_path)
-        self.test_xml_file = osp.join(self.dataset_dir, self.test_xml_path)
+        self.use_xml_file = False # json 형식 파일을 읽을 때 False로 둔다. 2025.04.48 by 윤경섭
+        if self.use_xml_file:
+            self.train_xml_file = osp.join(self.dataset_dir, self.train_xml_path)
+            self.test_xml_file = osp.join(self.dataset_dir, self.test_xml_path)
+        else:
+            self.train_xml_file = None
+            self.test_xml_file = None
         self.query_xml_file = None
         required_files = [
             self.dataset_dir,
@@ -62,8 +69,19 @@ class VeRi(ImageDataset):
     def __getitem__(self, index):
         img_path, pid, camid, dsetid, color_id, type_id = self.data[index]
         img = read_image(img_path)
+        
         if self.transform is not None:
             img = self._transform_image(self.transform, self.k_tfm, img)
+        """
+        arr = np.array(img)
+        arr_hwc = np.transpose(arr, (1, 2, 0)) 
+        # 3) 그리기
+        plt.figure(figsize=(4, 8))
+        plt.imshow(arr_hwc)                  # arr이 (H, W, 3)이므로 그대로 사용
+        plt.title(img_path.split('/')[-1])
+        plt.axis('off')
+        plt.show()
+        """
         item = {
             'img': img,
             'pid': pid,
@@ -95,25 +113,36 @@ class VeRi(ImageDataset):
         for items in data:
             typeid = items[5]
             types.add(typeid)
-        return len(types)    
+        return len(types)
+    
+    @staticmethod
+    def load_map(file_path):
+        mapping = {}
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    name, num = line.split()
+                    mapping[name.strip()] = int(num.strip())
+        return mapping    
 
     def process_dir(self, dir_path, xml_file, is_train=True):
         img_paths = glob.glob(osp.join(dir_path, '*.jpg'))
-        pattern = re.compile(r'([\d]+)_c(\d\d\d)')
+
+        if xml_file:
+            pattern = re.compile(r'([\d]+)_c(\d\d\d)')
+        else:
+            pattern = re.compile(r'([-\d]+)_c(\d)')         #market1501 type
 
         #주의 veri 의 데이터셋에서 주의 할 점은 파일의 pid 갯수와 xml 파일의 pid 갯수가 다르다는 것이다.
         # 예를 들어 파일의 pid 갯수는 576개이고 xml 파일의 pid 갯수는575개이다.
         pid_container = set()
 
-        if not xml_file:
-            for img_path in img_paths:
-                pid, _ = map(int, pattern.search(img_path).groups())
-                if pid == -1:
-                    continue # junk images are just ignored
-                pid_container.add(pid)
-            pid2label = {pid: label for label, pid in enumerate(pid_container)}
-
-        
+        for img_path in img_paths:
+            pid, _ = map(int, pattern.search(img_path).groups())
+            if pid == -1:
+                continue # junk images are just ignored
+            pid_container.add(pid)
+        pid2label = {pid: label for label, pid in enumerate(pid_container)}
 
         data = []
         #여기서 color_id와 type_id의 범위는 무조건 정의 되어 있는 갯수라고 생각하면 된다.
@@ -154,18 +183,50 @@ class VeRi(ImageDataset):
                     #camid = self.dataset_name + "_" + str(camid)
                 data.append((img_path, pid, camid, 0, color_id, type_id))
         else:
+            colormap, typemap = {}, {}
+            color_path = os.path.join(self.dataset_dir, 'list_color.txt')
+            type_path = os.path.join(self.dataset_dir, 'list_type.txt')
+            if os.path.exists(color_path):
+                colormap = VeRi.load_map(color_path)
+            else:
+                print("file {} exists. check the folder :".format(color_path))
+                sys.exit(0)
+            if os.path.exists(type_path):
+                typemap = VeRi.load_map(type_path)
+            else:
+                print("file {} exists. check the folder :".format(type_path))
+                sys.exit(0)
+            
             for img_path in img_paths:
                 pid, camid = map(int, pattern.search(img_path).groups())
+                color_id = -1
+                type_id = -1
                 if pid == -1: continue  # junk images are just ignored
                 assert 0 <= pid <= 776
                 assert 1 <= camid <= 20
                 camid -= 1  # index starts from 0
+                dir_path = os.path.dirname(img_path)
+                base = os.path.basename(img_path)     
+                name, ext = os.path.splitext(base)
+                json_file = os.path.join(dir_path, name + '.json')
+                if  os.path.exists(json_file):
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        jdata = json.load(f)
+                        # shapes[0]에서 label, color 추출
+                        shape = jdata.get('shapes', [{}])[0]
+                        label = shape.get('label')
+                        color = shape.get('color')
+                        type_id = typemap.get(label) if label and typemap else None
+                        color_id = colormap.get(color) if color and colormap else None
+                        color_id = int(color_id) - 1
+                        type_id = int(type_id) - 1
+                    
                 if is_train:
                     pid = pid2label[pid]
                     #pid = self.dataset_name + "_" + str(pid)
                     #camid = self.dataset_name + "_" + str(camid)
-                data.append((img_path, pid, camid,0,0,0))
-        
+                data.append((img_path, pid, camid,0,color_id, type_id))
+
         return data
         
     

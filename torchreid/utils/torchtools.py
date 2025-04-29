@@ -49,10 +49,15 @@ def save_checkpoint(
                 k = k[7:]
             new_state_dict[k] = v
         state['state_dict'] = new_state_dict
+        
+    #여기 아래 코드는 검증용 테스트 데이터 출력
+    state_dict = state['state_dict']
     # save
     epoch = state['epoch']
     fpath = osp.join(save_dir, 'model.pth.tar-' + str(epoch))
+    #fwpath = osp.join(save_dir, 'model-{}.pth'.format(str(epoch)))
     torch.save(state, fpath)
+    #torch.save(state_dict, fwpath)
     print('Checkpoint saved to "{}"'.format(fpath))
     if is_best:
         shutil.copy(fpath, osp.join(osp.dirname(fpath), 'model-best.pth.tar'))

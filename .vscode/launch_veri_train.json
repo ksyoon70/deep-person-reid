@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [     
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--config-file", "configs/im_osnet_x1_0_softmax_256x256_amsgrad_veri.yaml",
+                "--transforms", "random_flip","random_erase",
+                "-s", "veri",
+                "-t", "veri",
+                "--root", "VeRi"
+            ]
+        }
+    ]
+}
