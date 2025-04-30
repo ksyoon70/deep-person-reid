@@ -1,3 +1,5 @@
+#이 파일은 veri dataset가 xml 구조로 되어 있는 것을 json 형식으로 바꾸는  기능을 한다.
+#작성자 윤경섭 25.4.30
 import xml.etree.ElementTree as ET
 import json
 import os
@@ -37,8 +39,8 @@ def get_color(color_id):
 
 def process_veri_xml():
     # Paths
-    xml_path = "VeRi/veri/train_label.xml"
-    image_dir = "VeRi/veri/image_train"
+    xml_path = "VeRi/veri/test_label.xml"
+    image_dir = "VeRi/veri/image_test"
     
     # Create output directory if it doesn't exist
     output_dir = "VeRi/veri/json_labels"

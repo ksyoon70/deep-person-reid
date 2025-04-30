@@ -12,8 +12,8 @@ def convert_name(filename):
     if len(parts) < 4:
         return filename  # 예외처리
     cam = parts[1]
-    # cam[0] == 'c'이고 cam[2] == 's'이면 업데이트하지 않음
-    if not (len(cam) > 2 and cam[0] == 'c' and cam[2] == 's'):
+    # cam의 두번째 문자 이후에 's'가 포함되어 있는지, 또는 첫 글자가 'c'가 아닌지 확인
+    if cam[0] != 'c' or not ('s' in cam[2:]):
         cam_num = cam[1:].lstrip('0')  # '002' -> '2'
         new_cam = f'c{cam_num}s1'
         parts[1] = new_cam
@@ -23,6 +23,9 @@ def convert_name(filename):
     # parts[3]는 2자리로 맞춤 ('.'으로 나누어진 앞부분이 1글자면 2글자로)
     if '.' in parts[3]:
         prefix, *rest = parts[3].split('.', 1)
+        # prefix가 숫자로 변환 가능하면 0일 때 1로 변경
+        if prefix.isdigit() and int(prefix) == 0:
+            prefix = '1'
         if len(prefix) == 1:
             prefix = prefix.zfill(2)
         parts[3] = '.'.join([prefix] + rest) if rest else prefix
