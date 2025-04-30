@@ -202,7 +202,8 @@ class VeRi(ImageDataset):
                 color_id = -1
                 type_id = -1
                 if pid == -1: continue  # junk images are just ignored
-                assert 0 <= pid <= 776
+                #assert 0 <= pid <= 776
+                assert 0 <= pid <= 2000
                 assert 1 <= camid <= 20
                 camid -= 1  # index starts from 0
                 dir_path = os.path.dirname(img_path)
@@ -212,14 +213,14 @@ class VeRi(ImageDataset):
                 if  os.path.exists(json_file):
                     with open(json_file, 'r', encoding='utf-8') as f:
                         jdata = json.load(f)
-                        # shapes[0]에서 label, color 추출
-                        shape = jdata.get('shapes', [{}])[0]
-                        label = shape.get('label')
-                        color = shape.get('color')
-                        type_id = typemap.get(label) if label and typemap else None
-                        color_id = colormap.get(color) if color and colormap else None
-                        color_id = int(color_id) - 1
-                        type_id = int(type_id) - 1
+                        for shape in jdata.get("shapes", []):
+                            label = shape.get("label", "")
+                            if not 'window' in label:
+                                color = shape.get('color')
+                                type_id = typemap.get(label) if label and typemap else None
+                                color_id = colormap.get(color) if color and colormap else None
+                                color_id = int(color_id) - 1
+                                type_id = int(type_id) - 1
                     
                 if is_train:
                     pid = pid2label[pid]
