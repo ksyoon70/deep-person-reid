@@ -7,6 +7,11 @@ import shutil
 from typing import Set   # Python 3.8 호환 타입 힌트
 from glob import glob
 
+
+# --- 0) 4자리 숫자 PID를 담을 리스트 -----------------------------
+pid_list = []          # 필요하면 set() 후 나중에 리스트 변환도 가능
+pid_seen = set()       # 중복 방지용 내부 집합
+
 # ────────────────────────────────
 # 1.  색·종류 레퍼런스 읽기
 # ────────────────────────────────
@@ -52,7 +57,7 @@ def find_max_numeric_prefix(img_root: str) -> int:
 # ────────────────────────────────
 # 2.  JSON 1개 처리
 # ────────────────────────────────
-def process_one_json(json_path: str, dest_dir: str, max_id: int) -> int:
+def process_one_json(json_path: str, dest_dir: str, max_id: int, pid_list : list) -> None:
     """json_path를 변환·저장하고, 사용한 id를 반환"""
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
@@ -72,29 +77,30 @@ def process_one_json(json_path: str, dest_dir: str, max_id: int) -> int:
     stem, _ = os.path.splitext(base_name)             # 0001_xxx
     name_parts = stem.split("_")
 
-    new_id = max_id
-    if name_parts[0].isdigit():                       # 숫자 ID가 있을 때만
-        width   = len(name_parts[0])                  # 0001 → 4자리 유지
-        new_id  = max_id + 1
-        id_str  = str(new_id).zfill(width)
-        name_parts[0] = id_str
+    if name_parts[0].isdigit():
+        pid = int(name_parts[0])  # 숫자 ID가 있을 때만
+        if pid in pid_list:
+            width   = len(name_parts[0])                  # 0001 → 4자리 유지
+            new_id  = max_id + 1 + pid_list.index(pid)
+            id_str  = str(new_id).zfill(width)
+            name_parts[0] = id_str
 
-        new_stem       = "_".join(name_parts)
-        new_json_name  = new_stem + ".json"
+            new_stem       = "_".join(name_parts)
+            new_json_name  = new_stem + ".json"
 
-        # imagePath 수정
-        img_name = data.get("imagePath", "")
-        if img_name:
-            img_stem, img_ext = os.path.splitext(img_name)
-            img_parts         = img_stem.split("_")
-            if img_parts and img_parts[0].isdigit():
-                img_parts[0]   = id_str
-                new_img_name   = "_".join(img_parts) + img_ext
-                data["imagePath"] = new_img_name
+            # imagePath 수정
+            img_name = data.get("imagePath", "")
+            if img_name:
+                img_stem, img_ext = os.path.splitext(img_name)
+                img_parts         = img_stem.split("_")
+                if img_parts and img_parts[0].isdigit():
+                    img_parts[0]   = id_str
+                    new_img_name   = "_".join(img_parts) + img_ext
+                    data["imagePath"] = new_img_name
+                else:
+                    new_img_name = img_name
             else:
-                new_img_name = img_name
-        else:
-            new_img_name = ""
+                new_img_name = ""
     else:                                            # 숫자 ID가 없으면 그대로
         new_json_name  = base_name
         new_img_name   = data.get("imagePath", "")
@@ -111,7 +117,7 @@ def process_one_json(json_path: str, dest_dir: str, max_id: int) -> int:
             shutil.copy2(src_img_path,
             os.path.join(dest_dir, new_img_name))
 
-    return new_id      # 갱신된 id 리턴 (변경 없으면 기존 max_id 그대로)
+    return
 
 # ────────────────────────────────
 # 3.  실행
@@ -126,15 +132,25 @@ def main() -> None:
     bar_len = 40
     src_json_dir = os.path.join(BASE_DIR, "image_add")
     # --- 처리 대상 전체 목록(재귀) 한꺼번에 수집 ---
-    all_json = glob(os.path.join(src_json_dir, '**', '*.json'), recursive=True)
+    all_json = sorted(glob(os.path.join(src_json_dir, '**', '*.json'), recursive=True))
     total = len(all_json)
     if total == 0:
         print('변환할 파일이 없습니다.')
         exit(0)
 
+    # --- 변환 루프 ---------------------------------------------------
+    for idx, json_path in enumerate(all_json, 1):
+        # ② PID 추출 및 리스트 저장
+        pid_str = os.path.basename(json_path).split("_")[0]
+        if len(pid_str) == 4 and pid_str.isdigit():
+            pid = int(pid_str)
+            if pid not in pid_seen:   # 중복 체크
+                pid_seen.add(pid)
+                pid_list.append(pid)
+
     # --- 변환 루프 ---
     for idx, json_path in enumerate(all_json, 1):      # 1-based
-        max_id = process_one_json(json_path, DEST_DIR, max_id)
+        process_one_json(json_path, DEST_DIR, max_id,pid_list)
         # 진행상황 막대그래프
         done = int(bar_len * idx / total)
         bar = '■' * done + '-' * (bar_len - done)
