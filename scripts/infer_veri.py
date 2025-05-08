@@ -106,7 +106,7 @@ def load_model(cfg, datamanager):
     print('Building model: {}'.format(cfg.model.name))
     model = torchreid.models.build_model(
         name=cfg.model.name,
-        num_classes=(datamanager.num_train_pids + datamanager.num_train_color_ids + datamanager.num_train_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
+        num_classes=(datamanager.num_train_pids + datamanager.num_color_ids + datamanager.num_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
         loss=cfg.loss.name,
         pretrained=cfg.model.pretrained,
         use_gpu=cfg.use_gpu
@@ -217,7 +217,7 @@ def inference(cfg, model, datamanager, label_files, normalize_feature=False, dis
                     outputs = features
                     if cfg.data.root == 'VeRi':
                         pid_end = datamanager.num_train_pids                 # 575
-                        color_end = pid_end + datamanager.num_train_color_ids # 575 + 10 = 585
+                        color_end = pid_end + datamanager.num_color_ids # 575 + 10 = 585
                         logits_pid   = outputs[:, :pid_end]        # shape (B, 575)
                         logits_color = outputs[:, pid_end :color_end]     # shape (B, 10)
                         logits_type  = outputs[:, color_end:]        # shape (B, 9)
@@ -312,7 +312,7 @@ def inference(cfg, model, datamanager, label_files, normalize_feature=False, dis
             acc_type += 1
         # Create result filename
         #여기서 pid는 파일의 실제 값은 아니다.
-        result_filename = f"{filename}_pid_{g_pid + 1}_{o_color_label}({color_label})_{o_type_label}({type_label}).jpg"
+        result_filename = f"{filename}_pid_{g_o_pid + 1}({g_pid + 1})_{o_color_label}({color_label})_{o_type_label}({type_label}).jpg"
         # Save image to result directory
         shutil.copy2(g_impath, os.path.join(cfg.result, result_filename))
     print(f"Accuracy of pid: {acc_pid / total_images:.1%}")
@@ -340,6 +340,9 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
+    parser.add_argument('--train',
+                    type=lambda x: x.lower() in ['true', '1', 'yes'],
+                    default=False)
     parser.add_argument(
         '--config-file', type=str, default='', help='path to config file'
     )
@@ -372,6 +375,7 @@ def main():
     parser.add_argument(
         '--type_label', type=str, default='', help='path to type label file'
     )
+
     parser.add_argument(
         'opts',
         default=None,
@@ -380,13 +384,13 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.train == False:
+        args.transforms = ''
     cfg = get_default_config()
     cfg.use_gpu = torch.cuda.is_available()
     if args.config_file:
         cfg.merge_from_file(args.config_file)
     reset_config(cfg, args)
-    
-    
     
     # Merge remaining options
     if args.opts:
@@ -421,7 +425,7 @@ def main():
     print('Building model: {}'.format(cfg.model.name))
     model = torchreid.models.build_model(
         name=cfg.model.name,
-        num_classes= (datamanager.num_train_pids + datamanager.num_train_color_ids + datamanager.num_train_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
+        num_classes= (datamanager.num_train_pids + datamanager.num_color_ids + datamanager.num_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
         loss=cfg.loss.name,
         pretrained=cfg.model.pretrained,
         use_gpu=cfg.use_gpu

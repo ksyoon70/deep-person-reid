@@ -6,7 +6,10 @@ import json
 import shutil
 from typing import Set   # Python 3.8 호환 타입 힌트
 from glob import glob
-
+from pathlib import Path
+from collections import Counter, defaultdict
+from natsort import natsorted   # 사람이 읽기 좋은 자연 정렬(선택 사항)
+from typing import Iterator
 
 # --- 0) 4자리 숫자 PID를 담을 리스트 -----------------------------
 pid_list = []          # 필요하면 set() 후 나중에 리스트 변환도 가능
@@ -57,7 +60,7 @@ def find_max_numeric_prefix(img_root: str) -> int:
 # ────────────────────────────────
 # 2.  JSON 1개 처리
 # ────────────────────────────────
-def process_one_json(json_path: str, dest_dir: str, max_id: int, pid_list : list) -> None:
+def process_one_json(json_path: str, dest_dir: str, pid_list: list, pid_seen : set) -> None:
     """json_path를 변환·저장하고, 사용한 id를 반환"""
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
@@ -79,28 +82,36 @@ def process_one_json(json_path: str, dest_dir: str, max_id: int, pid_list : list
 
     if name_parts[0].isdigit():
         pid = int(name_parts[0])  # 숫자 ID가 있을 때만
-        if pid in pid_list:
-            width   = len(name_parts[0])                  # 0001 → 4자리 유지
-            new_id  = max_id + 1 + pid_list.index(pid)
-            id_str  = str(new_id).zfill(width)
-            name_parts[0] = id_str
+        if pid in pid_seen:
+            new_id = (pid_list[-1] if pid_list else 1)
+            if not pid_list:
+                pid_list.add(1) 
+        else:
+            max_id = (pid_list[-1] if pid_list else 0) + 1                  # 0001 → 4자리 유지
+            new_id  = max_id
+            pid_seen.add(pid)
+            pid_list.append(max_id)
+        width   = len(name_parts[0])
+        id_str  = str(new_id).zfill(width)
+        name_parts[0] = id_str
 
-            new_stem       = "_".join(name_parts)
-            new_json_name  = new_stem + ".json"
+        new_stem       = "_".join(name_parts)
+        new_json_name  = new_stem + ".json"
 
-            # imagePath 수정
-            img_name = data.get("imagePath", "")
-            if img_name:
-                img_stem, img_ext = os.path.splitext(img_name)
-                img_parts         = img_stem.split("_")
-                if img_parts and img_parts[0].isdigit():
-                    img_parts[0]   = id_str
-                    new_img_name   = "_".join(img_parts) + img_ext
-                    data["imagePath"] = new_img_name
-                else:
-                    new_img_name = img_name
+        # imagePath 수정
+        img_name = data.get("imagePath", "")
+        if img_name:
+            img_stem, img_ext = os.path.splitext(img_name)
+            img_parts         = img_stem.split("_")
+            if img_parts and img_parts[0].isdigit():
+                img_parts[0]   = id_str
+                new_img_name   = "_".join(img_parts) + img_ext
+                data["imagePath"] = new_img_name
             else:
-                new_img_name = ""
+                new_img_name = img_name
+        else:
+            new_img_name = ""
+
     else:                                            # 숫자 ID가 없으면 그대로
         new_json_name  = base_name
         new_img_name   = data.get("imagePath", "")
@@ -119,42 +130,89 @@ def process_one_json(json_path: str, dest_dir: str, max_id: int, pid_list : list
 
     return
 
+def scan_folders(root: Path) -> Iterator[Path]:
+    """root 이하 모든 폴더를 yield.
+    하위 폴더가 없으면 root 자체를 한 번 yield.
+    """
+    root = root.resolve()
+    yielded = False
+
+    # os.walk() 는 내부적으로 os.scandir()를 사용 → DirEntry.is_dir() 캐시로 빠름
+    for dirpath, dirnames, _ in os.walk(root):
+        for dn in dirnames:          # 파일 목록(filenames)은 무시
+            yielded = True
+            yield Path(dirpath) / dn
+
+    if not yielded:                 # 하위 폴더가 하나도 없었다면
+        yield root
+
+def iter_json_sorted(folder: Path, *, natural=False):
+    """folder 안의 *.json 파일을 이름 기준으로 정렬해 yield"""
+    json_paths = list(folder.glob('*.json'))
+
+    # ① 알파벳/사전 순
+    if not natural:
+        json_paths = sorted(json_paths, key=lambda p: p.name)        # 또는 p.stem
+
+    # ② 사람이 읽기 좋은 자연 정렬(파일1, 파일2, … 파일10)
+    else:
+        json_paths = natsorted(json_paths, key=lambda p: p.name)
+
+    for p in json_paths:
+        yield p
+
+
+def count_json_per_folder(root_dir):
+    """
+    root_dir 이하 모든 디렉터리를 재귀 탐색해
+    {폴더 경로(Path): json 개수(int)} 딕셔너리를 반환.
+    """
+    root = Path(root_dir).resolve()
+    counter = Counter()
+
+    # ① 모든 .json 경로를 재귀적으로 찾는다
+    for json_path in root.rglob("*.json"):
+        folder = json_path.parent            # json이 속한 디렉터리
+        counter[folder] += 1
+
+    return counter
+
 # ────────────────────────────────
 # 3.  실행
 # ────────────────────────────────
 def main() -> None:
 
-    # 3-A. image_train 최대 ID 계산
-    train_dir = os.path.join(BASE_DIR, "image_train")
-    max_id = find_max_numeric_prefix(train_dir)
-    print(f"image_train 폴더에서 발견한 최대 ID: {max_id}")
+    #json 데이터들이 있는 폴더
+    src_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\train_src').resolve()
+    det_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\save').resolve()
 
-    bar_len = 40
-    src_json_dir = os.path.join(BASE_DIR, "image_add")
-    # --- 처리 대상 전체 목록(재귀) 한꺼번에 수집 ---
-    all_json = sorted(glob(os.path.join(src_json_dir, '**', '*.json'), recursive=True))
-    total = len(all_json)
+    os.makedirs(det_dir, exist_ok=True)
+
+    all_json = count_json_per_folder(src_dir)
+    total = 0
+    for folder, n in all_json.items():
+        rel = folder.relative_to(src_dir).as_posix() or "."   # 루트 자체는 "."
+        print(f"{rel:30s} : {n}개")
+        total += n
     if total == 0:
         print('변환할 파일이 없습니다.')
         exit(0)
 
-    # --- 변환 루프 ---------------------------------------------------
-    for idx, json_path in enumerate(all_json, 1):
-        # ② PID 추출 및 리스트 저장
-        pid_str = os.path.basename(json_path).split("_")[0]
-        if len(pid_str) == 4 and pid_str.isdigit():
-            pid = int(pid_str)
-            if pid not in pid_seen:   # 중복 체크
-                pid_seen.add(pid)
-                pid_list.append(pid)
-
-    # --- 변환 루프 ---
-    for idx, json_path in enumerate(all_json, 1):      # 1-based
-        process_one_json(json_path, DEST_DIR, max_id,pid_list)
-        # 진행상황 막대그래프
-        done = int(bar_len * idx / total)
-        bar = '■' * done + '-' * (bar_len - done)
-        print(f'진행중: [{bar}] {idx}/{total}', end='\r')
+    broken_json = defaultdict(list)
+    idx = 0
+    bar_len = 40
+    for folder in scan_folders(src_dir):
+        pid_seen.clear() 
+        for json_file in iter_json_sorted(folder, natural=True):
+            idx += 1           
+            try:
+                process_one_json(json_file, det_dir,pid_list,pid_seen)
+                # 진행상황 막대그래프
+                done = int(bar_len * idx / total)
+                bar = '■' * done + '-' * (bar_len - done)
+                print(f'진행중: [{bar}] {idx}/{total}', end='\r')
+            except Exception as e:           # JSON 파싱 실패 기록
+                broken_json[folder].append(json_file.name)
 
     print(f"완료: '{DEST_DIR}' 폴더에 변환-복사된 파일이 저장되었습니다.")
 

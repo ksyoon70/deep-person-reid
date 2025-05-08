@@ -13,14 +13,14 @@ from torchreid.utils import (
 
 from default_config import (
     imagedata_kwargs, optimizer_kwargs, videodata_kwargs, engine_run_kwargs,
-    get_default_config, lr_scheduler_kwargs
+    get_default_config, lr_scheduler_kwargs, veri_imagedata_kwargs
 )
 from collections import OrderedDict
 
 def build_datamanager(cfg):
     if cfg.data.type == 'image':
         if cfg.data.root == 'VeRi':
-            return torchreid.data.VehicleImageDataManager(**imagedata_kwargs(cfg))
+            return torchreid.data.VehicleImageDataManager(**veri_imagedata_kwargs(cfg))
         else:
             return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
     else:
@@ -89,6 +89,10 @@ def reset_config(cfg, args):
         cfg.data.targets = args.targets
     if args.transforms:
         cfg.data.transforms = args.transforms
+    if args.color_label:        # color label, type label 경로 추가 by 윤경섭 25.05.07
+        cfg.veri.color_class_filename = args.color_label
+    if args.type_label:
+        cfg.veri.type_class_filename = args.type_label
 
 
 def check_cfg(cfg):
@@ -101,6 +105,9 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
+    parser.add_argument('--train',
+                    type=lambda x: x.lower() in ['true', '1', 'yes'],
+                    default=False)
     parser.add_argument(
         '--config-file', type=str, default='', help='path to config file'
     )
@@ -124,6 +131,18 @@ def main():
     parser.add_argument(
         '--root', type=str, default='', help='path to data root'
     )
+    #---------------이 부분은 필요가 없지만 공통 영역으로 넣어 두었다. -----------
+    parser.add_argument(
+        '--result', type=str, default='', help='path to result directory'
+    )
+    parser.add_argument(
+        '--color_label', type=str, default='', help='path to color label file'
+    )
+    parser.add_argument(
+        '--type_label', type=str, default='', help='path to type label file'
+    )
+    #-----------------------------------------------------------------------
+    #이후의 부분은 옵션 처리
     parser.add_argument(
         'opts',
         default=None,
@@ -137,7 +156,8 @@ def main():
     if args.config_file:
         cfg.merge_from_file(args.config_file) # load values from a file
     reset_config(cfg, args)
-    cfg.merge_from_list(args.opts)
+    if args.opts:
+        cfg.merge_from_list(args.opts)
     set_random_seed(cfg.train.seed)
     check_cfg(cfg)
 
@@ -157,7 +177,7 @@ def main():
     print('Building model: {}'.format(cfg.model.name))
     model = torchreid.models.build_model(
         name=cfg.model.name,
-        num_classes= (datamanager.num_train_pids + datamanager.num_train_color_ids + datamanager.num_train_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
+        num_classes= (datamanager.num_train_pids + datamanager.num_color_ids + datamanager.num_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
         loss=cfg.loss.name,
         pretrained=cfg.model.pretrained,
         use_gpu=cfg.use_gpu
@@ -168,8 +188,9 @@ def main():
     )
     print('Model complexity: params={:,} flops={:,}'.format(num_params, flops))
 
-    if cfg.model.load_weights and check_isfile(cfg.model.load_weights):
-        load_pretrained_weights(model, cfg.model.load_weights)
+    if args.train  == False: #이건, inference에 쓰는 코드
+        if cfg.model.load_weights and check_isfile(cfg.model.load_weights):
+            load_pretrained_weights(model, cfg.model.load_weights)
 
 
     if cfg.use_gpu:
@@ -179,12 +200,13 @@ def main():
     scheduler = torchreid.optim.build_lr_scheduler(
         optimizer, **lr_scheduler_kwargs(cfg)
     )
-
+    # 당분간 쓰진 않느다.
+    """
     if cfg.model.resume and check_isfile(cfg.model.resume):
         cfg.train.start_epoch = resume_from_checkpoint(
             cfg.model.resume, model, optimizer=optimizer, scheduler=scheduler
         )
-
+    """
     print(
         'Building {}-engine for {}-reid'.format(cfg.loss.name, cfg.data.type)
     )
