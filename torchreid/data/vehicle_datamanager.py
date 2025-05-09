@@ -47,7 +47,9 @@ class VehicleImageDataManager(DataManager):
         train_sampler_t='RandomSampler',
         cuhk03_labeled=False,
         cuhk03_classic_split=False,
-        market1501_500k=False
+        market1501_500k=False,
+        color_list_file='VeRi/veri/list_color.txt',
+        type_list_file='VeRi/veri/list_type.txt'
     ):
         # 먼저 부모 클래스(ImageDataManager)의 __init__을 호출
         super(VehicleImageDataManager, self).__init__(
@@ -74,24 +76,26 @@ class VehicleImageDataManager(DataManager):
                 split_id=split_id,
                 cuhk03_labeled=cuhk03_labeled,
                 cuhk03_classic_split=cuhk03_classic_split,
-                market1501_500k=market1501_500k
+                market1501_500k=market1501_500k,
+                color_list_file=color_list_file,
+                type_list_file=type_list_file
             )
             trainset.append(trainset_)
         trainset = sum(trainset)
 
         self._num_train_pids = trainset.num_train_pids
         self._num_train_cams = trainset.num_train_cams
-      
-        if hasattr(trainset, 'num_train_color_ids'):
-            self._num_train_color_ids = trainset.num_train_color_ids
+
+        if hasattr(trainset, 'num_color_ids'):
+            self._num_color_ids = trainset.num_color_ids
         else:
             # 존재하지 않을 경우 대비, 0 또는 None 할당
-            self._num_train_color_ids = 0
+            self._num_color_ids = 0
 
-        if hasattr(trainset, 'num_train_type_ids'):
-            self._num_train_type_ids = trainset.num_train_type_ids
+        if hasattr(trainset, 'num_type_ids'):
+            self._num_type_ids = trainset.num_type_ids
         else:
-            self._num_train_type_ids = 0
+            self._num_type_ids = 0
 
         """
         torch.utils.data.DataLoader는 PyTorch에서 데이터를 로드하고, 이를 모델에 전달하기 위한 효율적인 방법을 제공하는 클래스입니다. 이 함수는 데이터셋을 쉽게 반복(iterate)할 수 있도록 여러 유용한 기능을 제공합니다. 주로 Dataset 객체와 함께 사용되며, 배치(batch) 처리, 셔플(shuffle), 병렬 처리 등을 지원합니다.
@@ -141,7 +145,9 @@ class VehicleImageDataManager(DataManager):
                     split_id=split_id,
                     cuhk03_labeled=cuhk03_labeled,
                     cuhk03_classic_split=cuhk03_classic_split,
-                    market1501_500k=market1501_500k
+                    market1501_500k=market1501_500k,
+                    color_list_file=color_list_file,
+                    type_list_file=type_list_file
                 )
                 trainset_t.append(trainset_t_)
             trainset_t = sum(trainset_t)
@@ -190,7 +196,9 @@ class VehicleImageDataManager(DataManager):
                 split_id=split_id,
                 cuhk03_labeled=cuhk03_labeled,
                 cuhk03_classic_split=cuhk03_classic_split,
-                market1501_500k=market1501_500k
+                market1501_500k=market1501_500k,
+                color_list_file=color_list_file,
+                type_list_file=type_list_file
             )
             self.test_loader[name]['query'] = torch.utils.data.DataLoader(
                 queryset,
@@ -212,7 +220,9 @@ class VehicleImageDataManager(DataManager):
                 split_id=split_id,
                 cuhk03_labeled=cuhk03_labeled,
                 cuhk03_classic_split=cuhk03_classic_split,
-                market1501_500k=market1501_500k
+                market1501_500k=market1501_500k,
+                color_list_file=color_list_file,
+                type_list_file=type_list_file
             )
             self.test_loader[name]['gallery'] = torch.utils.data.DataLoader(
                 galleryset,
@@ -237,8 +247,8 @@ class VehicleImageDataManager(DataManager):
             print(
                 '  # target images   : {} (unlabeled)'.format(len(trainset_t))
             )
-        print('   # source color IDs (train) : {}'.format(self._num_train_color_ids))
-        print('   # source type IDs (train)  : {}'.format(self._num_train_type_ids))
+        print('   # source color IDs (train) : {}'.format(self._num_color_ids))
+        print('   # source type IDs (train)  : {}'.format(self._num_type_ids))
         print('  target            : {}'.format(self.targets))
         print('  *****************************************')
         print('\n')
@@ -248,13 +258,13 @@ class VehicleImageDataManager(DataManager):
          
 
     @property
-    def num_train_color_ids(self):
+    def num_color_ids(self):
         """Returns the number of training color IDs."""
-        return self._num_train_color_ids
+        return self._num_color_ids
 
     @property
-    def num_train_type_ids(self):
+    def num_type_ids(self):
         """Returns the number of training type IDs."""
-        return self._num_train_type_ids
+        return self._num_type_ids
     
     

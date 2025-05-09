@@ -44,6 +44,7 @@ def get_default_config():
     cfg.cuhk03.classic_split = False # use classic split by Li et al. CVPR14
     cfg.cuhk03.use_metric_cuhk03 = False # use cuhk03's metric for evaluation
 
+
     # sampler
     cfg.sampler = CN()
     cfg.sampler.train_sampler = 'RandomSampler'

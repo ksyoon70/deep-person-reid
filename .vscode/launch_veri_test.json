@@ -8,8 +8,10 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
+            	"--train","false",
                 "--config-file", "configs/im_osnet_x1_0_softmax_256x256_amsgrad_veri.yaml",
-                "-s", "veri",
+                "--transforms", "random_flip","random_erase",                
+                "-s", "veri",				
                 "-t", "veri",
                 "--root", "VeRi",
                 "--result", "VeRi/veri/results",

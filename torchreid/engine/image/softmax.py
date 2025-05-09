@@ -72,7 +72,7 @@ class ImageSoftmaxEngine(Engine):
         self.register_model('model', model, optimizer, scheduler)
 
         self.criterion = CrossEntropyLoss(
-            num_classes=self.datamanager.num_train_pids + self.datamanager.num_train_color_ids + self.datamanager.num_train_type_ids if self.datamanager.targets[0] == 'veri' else self.datamanager.num_train_pids,
+            num_classes=self.datamanager.num_train_pids + self.datamanager.num_color_ids + self.datamanager.num_type_ids if self.datamanager.targets[0] == 'veri' else self.datamanager.num_train_pids,
             use_gpu=self.use_gpu,
             label_smooth=label_smooth
         )
@@ -114,7 +114,7 @@ class ImageSoftmaxEngine(Engine):
             # 슬라이싱 인덱스 주의: 0~574까지 pid, 575~584까지 color, 585~593까지 type
             # pid: 0 ~ (575-1), color: 575 ~ (575+10-1)=584, type: 585 ~ (585+9-1)=593
             pid_end = self.datamanager.num_train_pids                 # 575
-            color_end = pid_end + self.datamanager.num_train_color_ids # 575 + 10 = 585
+            color_end = pid_end + self.datamanager.num_color_ids # 575 + 10 = 585
             logits_pid   = outputs[:, :pid_end]        # shape (B, 575)
             logits_color = outputs[:, pid_end :color_end]     # shape (B, 10)
             logits_type  = outputs[:, color_end:]        # shape (B, 9)

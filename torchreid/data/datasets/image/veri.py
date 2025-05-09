@@ -42,6 +42,9 @@ class VeRi(ImageDataset):
         self.query_dir = osp.join(self.dataset_dir, 'image_query')
         self.gallery_dir = osp.join(self.dataset_dir, 'image_test')
         self.use_xml_file = False # json 형식 파일을 읽을 때 False로 둔다. 2025.04.48 by 윤경섭
+        self.color_path = kwargs['color_list_file']
+        self.type_path = kwargs['type_list_file']
+        self.colormap, self.typemap = {}, {}
         if self.use_xml_file:
             self.train_xml_file = osp.join(self.dataset_dir, self.train_xml_path)
             self.test_xml_file = osp.join(self.dataset_dir, self.test_xml_path)
@@ -63,8 +66,8 @@ class VeRi(ImageDataset):
         
         super(VeRi, self).__init__(train, query, gallery, **kwargs)
         #추가로 color_id 와 type_id 갯수를 계산을 한다.
-        self.num_train_color_ids = self.get_num_colors(train)
-        self.num_train_type_ids = self.get_num_types(train)
+        self.num_color_ids = self.get_num_colors()
+        self.num_type_ids = self.get_num_types()
 
     def __getitem__(self, index):
         img_path, pid, camid, dsetid, color_id, type_id = self.data[index]
@@ -93,27 +96,12 @@ class VeRi(ImageDataset):
         }
         return item
 
-    def get_num_colors(self, data):
-        """Returns the number of training colors.
+    def get_num_colors(self):
+        
+        return len(self.colormap)
 
-        Each tuple in data contains (img_path(s), pid, camid, dsetid, color_id, type_id).
-        """
-        colors = set()
-        for items in data:
-            colorid = items[4]
-            colors.add(colorid)
-        return len(colors)
-
-    def get_num_types(self, data):
-        """Returns the number of training types.
-
-        Each tuple in data contains (img_path(s), pid, camid, dsetid, color_id, type_id).
-        """
-        types = set()
-        for items in data:
-            typeid = items[5]
-            types.add(typeid)
-        return len(types)
+    def get_num_types(self):
+        return len(self.typemap)
     
     @staticmethod
     def load_map(file_path):
@@ -183,18 +171,16 @@ class VeRi(ImageDataset):
                     #camid = self.dataset_name + "_" + str(camid)
                 data.append((img_path, pid, camid, 0, color_id, type_id))
         else:
-            colormap, typemap = {}, {}
-            color_path = os.path.join(self.dataset_dir, 'list_color.txt')
-            type_path = os.path.join(self.dataset_dir, 'list_type.txt')
-            if os.path.exists(color_path):
-                colormap = VeRi.load_map(color_path)
+            
+            if os.path.exists(self.color_path):
+                self.colormap = VeRi.load_map(self.color_path)
             else:
-                print("file {} exists. check the folder :".format(color_path))
+                print("file {} exists. check the folder :".format(self.color_path))
                 sys.exit(0)
-            if os.path.exists(type_path):
-                typemap = VeRi.load_map(type_path)
+            if os.path.exists(self.type_path):
+                self.typemap = VeRi.load_map(self.type_path)
             else:
-                print("file {} exists. check the folder :".format(type_path))
+                print("file {} exists. check the folder :".format(self.type_path))
                 sys.exit(0)
             
             for img_path in img_paths:
@@ -217,8 +203,8 @@ class VeRi(ImageDataset):
                             label = shape.get("label", "")
                             if not 'window' in label:
                                 color = shape.get('color')
-                                type_id = typemap.get(label) if label and typemap else None
-                                color_id = colormap.get(color) if color and colormap else None
+                                type_id = self.typemap.get(label) if label and self.typemap else None
+                                color_id = self.colormap.get(color) if color and self.colormap else None
                                 color_id = int(color_id) - 1
                                 type_id = int(type_id) - 1
                     
@@ -229,5 +215,3 @@ class VeRi(ImageDataset):
                 data.append((img_path, pid, camid,0,color_id, type_id))
 
         return data
-        
-    

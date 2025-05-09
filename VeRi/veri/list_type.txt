@@ -1,5 +1,5 @@
 car			1
-truck		2
+truck			2
 bus			3
-motorcycle	4
+motorcycle		4
 human		5
