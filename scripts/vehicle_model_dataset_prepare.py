@@ -75,8 +75,13 @@ def split_and_copy_files(src_dir, ntrain_dirs, nvalid_dirs, train_ratio=0.8):
             src_subdir = os.path.join(root, dir_name)
             mo_name_folder = os.path.basename(src_subdir)
             for train_dir in ntrain_dirs:
-                nmo_name_folder = os.path.basename(train_dir)
-                if nmo_name_folder in mo_name_folder:
+                nmo_name_folder = os.path.basename(train_dir)  #모델이름만 추출한다.
+                mo_name_folder_parts = mo_name_folder.split('_')
+                if len(mo_name_folder_parts) >= 2:
+                    model_name = '_'.join(mo_name_folder_parts[:2])
+                else:
+                    model_name = mo_name_folder # '_'가 없거나 하나뿐인 경우 전체 문자열 반환
+                if nmo_name_folder == model_name:
                     all_files = [f for f in os.listdir(src_subdir) if os.path.isfile(os.path.join(src_subdir, f))]
                     image_exts = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
                     image_files = [f for f in all_files if os.path.splitext(f)[1].lower() in image_exts]
@@ -102,7 +107,7 @@ def split_and_copy_files(src_dir, ntrain_dirs, nvalid_dirs, train_ratio=0.8):
                         print_progress(copied_pairs, total_pairs)
                     valid_dir = [
                         d for d in nvalid_dirs
-                        if nmo_name_folder in Path(d).name
+                        if nmo_name_folder == Path(d).name
                     ]
                     if len(valid_dir):
                         for img, js in valid_pairs:

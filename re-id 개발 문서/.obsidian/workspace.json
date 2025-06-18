@@ -1,0 +1,227 @@
+{
+  "main": {
+    "id": "5048fb330095a4fc",
+    "type": "split",
+    "children": [
+      {
+        "id": "19634fdf24b2e447",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "67438124880ac1bf",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "환영합니다!.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "환영합니다!"
+            }
+          },
+          {
+            "id": "56c097a6918cfd0e",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "1. 한국 자동차 re-id 데이터 생성 하기.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "1. 한국 자동차 re-id 데이터 생성 하기"
+            }
+          },
+          {
+            "id": "d58094d3599a1b2d",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "1. 한국 자동차 re-id 데이터 생성 하기.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "1. 한국 자동차 re-id 데이터 생성 하기"
+            }
+          }
+        ],
+        "currentTab": 2
+      },
+      {
+        "id": "f611e531f200c44d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5f46f6011278670c",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "그래프 뷰"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "5ffd93e588ad0bf1",
+    "type": "split",
+    "children": [
+      {
+        "id": "604fe969f39eda5a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f83c6af8ffe9ed4a",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "파일 탐색기"
+            }
+          },
+          {
+            "id": "3f182d72e21bbe60",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "검색"
+            }
+          },
+          {
+            "id": "a0de6483666bd948",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "북마크"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d2f4ebb94f96ed86",
+    "type": "split",
+    "children": [
+      {
+        "id": "2fcaebaaff4e7532",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "2d9d30954d0b1ebd",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "1. 한국 자동차 re-id 데이터 생성 하기.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "1. 한국 자동차 re-id 데이터 생성 하기 의 백링크"
+            }
+          },
+          {
+            "id": "483230c7b3a2cb25",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "1. 한국 자동차 re-id 데이터 생성 하기.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "1. 한국 자동차 re-id 데이터 생성 하기 의 나가는 링크"
+            }
+          },
+          {
+            "id": "b6fe89d65adc594f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "태그"
+            }
+          },
+          {
+            "id": "d0ec0da20ecbcfdb",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "1. 한국 자동차 re-id 데이터 생성 하기.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "1. 한국 자동차 re-id 데이터 생성 하기 의 개요"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:빠른 전환기 열기": false,
+      "graph:그래프 뷰 열기": false,
+      "canvas:새 캔버스 만들기": false,
+      "daily-notes:오늘의 일일 노트 열기": false,
+      "templates:템플릿 삽입": false,
+      "command-palette:명령어 팔레트 열기": false
+    }
+  },
+  "active": "d58094d3599a1b2d",
+  "lastOpenFiles": [
+    "Attached files/Pasted image 20250617140400.png",
+    "Attached files/Pasted image 20250617140149.png",
+    "Attached files/Pasted image 20250617140106.png",
+    "1. 한국 자동차 re-id 데이터 생성 하기.md",
+    "VeRi-776.md",
+    "Attached files/YongtaiPoint_Google.jpg",
+    "환영합니다!.md",
+    "Attached files"
+  ]
+}

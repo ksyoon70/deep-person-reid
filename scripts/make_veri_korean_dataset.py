@@ -1,9 +1,11 @@
 """
-Created on 2025년 5월 9일
-src_dir 변수에 예를들어 VeRi\veri\image_add 가 할당되어 있고 
-det_dir 변수에 예를 들어 \VeRi\veri\save 라고 할당 되어 있다고 하자.
-그러면 이 코드는 src_dir의 하위 디렉토리를 검사하여 labelme에서 re-id용으로 저장한 파일을 읽어 det_dir에 id가 src_dir의 id 중 가장 작은 값으로 합치는 기능을 한다.
-이 파일의 용도는 같은 차량이 다른 id로 분류 되어 있을 때 합치는 용도이다.
+Created on 2025년 6월 18일
+이 파일은 veri-776 dataset에 한국 차량을 추가하는 코드이다.
+vehicle_model_dataset_prepare.py로 생성된 한국차량 데이터셋을 veri-776에 id가 겹치지 않게 추가한다.
+src_dir 변수에 예를들어 VeRi\veri\image_add 가 할당되어 있고
+veri-776 데이터셋이 있는 곳을 vsrc_dir 변수에 할당 되어 있다고 하자.
+det_dir 변수에 예를 들어 \VeRi\veri\save 라고 할당 되어 있고 이곳에 추가된 데이터셋이 저장된다.
+그러면 이 코드는 src_dir의 하위 디렉토리를 검사하여 labelme에서 re-id용으로 저장한 파일을 읽어 det_dir에 id가 겹치지 않게, 속성을 추가하여 저장하는 코드이다.
 단 color 라벨 파일 list_color.txt type라벨 파일 list_type.txt은 /Veri/veri 아래에 저장되어 있다고 판단한다.
 @author:  윤경섭
 """
@@ -52,7 +54,7 @@ TYPE_SET  = load_first_tokens(type_path)
 # ────────────────────────────────
 # 1.  JSON 1개 처리
 # ────────────────────────────────
-def process_one_json(json_path: str, dest_dir: str, merge_id : int) -> None:
+def process_one_json(json_path: str, dest_dir: str, pid_list: list, pid_seen : set) -> None:
     """json_path를 변환·저장하고, 사용한 id를 반환"""
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
@@ -74,7 +76,15 @@ def process_one_json(json_path: str, dest_dir: str, merge_id : int) -> None:
 
     if name_parts[0].isdigit():
         pid = int(name_parts[0])  # 숫자 ID가 있을 때만
-        new_id =  merge_id
+        if pid in pid_seen:
+            new_id = (pid_list[-1] if pid_list else 1)
+            if not pid_list:
+                pid_list.add(1) 
+        else:
+            max_id = (pid_list[-1] if pid_list else 0) + 1                  # 0001 → 4자리 유지
+            new_id  = max_id
+            pid_seen.add(pid)
+            pid_list.append(max_id)
         width   = len(name_parts[0])
         id_str  = str(new_id).zfill(width)
         name_parts[0] = id_str
@@ -145,31 +155,6 @@ def iter_json_sorted(folder: Path, *, natural=False):
     for p in json_paths:
         yield p
 
-def get_min_id(folder: Path, *, natural=False) -> int:
-    """folder 안의 *.json 파일을 이름 기준으로 정렬해 yield"""
-    json_paths = list(folder.glob('*.json'))
-
-    # ① 알파벳/사전 순
-    if not natural:
-        json_paths = sorted(json_paths, key=lambda p: p.name)        # 또는 p.stem
-
-    # ② 사람이 읽기 좋은 자연 정렬(파일1, 파일2, … 파일10)
-    else:
-        json_paths = natsorted(json_paths, key=lambda p: p.name)
-
-    pid = -1
-    for p in json_paths:
-        # ---------- 파일명(ID) 취득 ----------
-        base_name = os.path.basename(p)           # 0001_xxx.json
-        stem, _ = os.path.splitext(base_name)             # 0001_xxx
-        name_parts = stem.split("_")
-
-        if name_parts[0].isdigit():
-            pid = int(name_parts[0])  # 숫자 ID가 있을 때만
-            break
-    
-    return pid
-
 
 def count_json_per_folder(root_dir):
     """
@@ -192,7 +177,8 @@ def count_json_per_folder(root_dir):
 def main() -> None:
 
     #json 데이터들이 있는 폴더
-    src_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_add').resolve()
+    src_dir = Path(r'E:\윤경섭\vehicle_model\train').resolve()
+    vsrc_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_train').resolve()        #veri-776 dataset이 있는 곳.
     det_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\save').resolve()
 
     os.makedirs(det_dir, exist_ok=True)
@@ -207,22 +193,27 @@ def main() -> None:
         print('변환할 파일이 없습니다.')
         exit(0)
 
-    merge_id  = get_min_id(src_dir)
-
-    merge_id = 127
-
-    if merge_id == 0:
-        print(f'{src_dir} 에서 id를 얻을 수 없습니다.')
-        sys.exit(0)
-
     broken_json = defaultdict(list)
     idx = 0
     bar_len = 40
-    for folder in scan_folders(src_dir):
+
+    # veri-776 데이터셋 추가
+    for folder in scan_folders(vsrc_dir):
+        pid_seen.clear() 
         for json_file in iter_json_sorted(folder, natural=True):
             idx += 1           
             try:
-                process_one_json(json_file, det_dir,merge_id)
+                process_one_json(json_file, det_dir,pid_list,pid_seen)
+            except Exception as e:           # JSON 파싱 실패 기록
+                broken_json[folder].append(json_file.name)
+
+    # 한국차량 데이터셋 추가
+    for folder in scan_folders(src_dir):
+        pid_seen.clear() 
+        for json_file in iter_json_sorted(folder, natural=True):
+            idx += 1           
+            try:
+                process_one_json(json_file, det_dir,pid_list,pid_seen)
                 # 진행상황 막대그래프
                 done = int(bar_len * idx / total)
                 bar = '■' * done + '-' * (bar_len - done)

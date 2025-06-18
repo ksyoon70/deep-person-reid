@@ -125,7 +125,7 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
-    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=num_classes)
+    model = EfficientNet.from_pretrained('efficientnet-b4', num_classes=num_classes)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model = model.to(device)
     model.eval()
@@ -208,8 +208,13 @@ def main():
             for _, _, img_path_to_move in group_predictions_info: # Move all processed images in the group
                 try:
                     destination = target_group_dir / img_path_to_move.name
-                    shutil.move(str(img_path_to_move), str(destination))
-                    # print(f"    Moved: {img_path_to_move.name} -> {destination}")
+                    shutil.copy(str(img_path_to_move), str(destination))
+                    # Copy corresponding .json file if exists
+                    json_path = img_path_to_move.with_suffix('.json')
+                    if json_path.exists():
+                        json_destination = target_group_dir / json_path.name
+                        shutil.copy(str(json_path), str(json_destination))
+                    # print(f"    Copied: {img_path_to_move.name} -> {destination}")
                 except Exception as e:
                     print(f"    Error moving file {img_path_to_move.name} to {destination}: {e}")
 
@@ -247,8 +252,13 @@ def main():
             target_ind_dir = result_dir / effective_class_name
             target_ind_dir.mkdir(parents=True, exist_ok=True)
             destination = target_ind_dir / img_path.name
-            shutil.move(str(img_path), str(destination))
-            # print(f"    Moved: {img_path.name} -> {destination}")
+            shutil.copy(str(img_path), str(destination))
+            # Copy corresponding .json file if exists
+            json_path = img_path.with_suffix('.json')
+            if json_path.exists():
+                json_destination = target_ind_dir / json_path.name
+                shutil.copy(str(json_path), str(json_destination))
+            # print(f"    Copied: {img_path.name} -> {destination}")
 
         except Exception as e:
             print(f"  Error processing ungrouped image {img_path.name}: {e}")

@@ -23,7 +23,7 @@ def load_first_tokens(txt_path: str) -> Set[str]:
 def main() -> None:
     # (1) 라벨 파일들이 있는 최상위 폴더
     src_dir = os.path.normpath(
-        r'Z:\영상라벨링\작업완료\147차_시즌3(0421)\객체추적\오정은\006(0.5일)'
+        r'E:\강은진\022'
     )
 
     # (2) VeRi 기준 색·차종 레퍼런스
@@ -35,6 +35,8 @@ def main() -> None:
     label_list = [f"{vt}_{cl}"  for vt in sorted(type_set) for cl in sorted(color_set)]
     if "window" not in label_list:
         label_list.append("window")
+    if 'plate' not in label_list:
+        label_list.append('plate')
 
     # (4) 오류 파일 보관 폴더
     error_dir = os.path.join(src_dir, "label_error")

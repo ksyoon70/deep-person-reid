@@ -41,6 +41,13 @@ def main():
     image_size = 224
     transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
+        transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+        transforms.RandomRotation(degrees=15),
+        transforms.RandomAffine(degrees=0, translate=(0.05, 0.05), scale=(0.95, 1.05), shear=5),
+        transforms.RandomPerspective(distortion_scale=0.2, p=0.5),
+        transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -48,15 +55,38 @@ def main():
     valid_dataset = VehicleDataset(str(valid_dir), transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-    model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=num_classes)
+    model = EfficientNet.from_pretrained('efficientnet-b4', num_classes=num_classes)
     model = model.to(device)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    patience = 3  # EarlyStopping patience
+    EPOCHS_HEAD = 10
+    def set_trainable_layers(model, epoch, EPOCHS_HEAD=10):
+        if epoch < EPOCHS_HEAD:
+            # fc layer만 학습
+            for name, param in model.named_parameters():
+                if name.startswith('_fc'):
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+        else:
+            # block1 이후 전체 학습 (block1, block2, ..., _fc)
+            for name, param in model.named_parameters():
+                if name.startswith('_blocks.0'):
+                    param.requires_grad = False
+                else:
+                    param.requires_grad = True
+    patience = 7  # EarlyStopping patience
     early_stopping = EarlyStopping(patience=patience)
     best_val_acc = 0.0
     best_model_path = 'efficientnet_vehicle_model_best.pth'
+    # Learning rate scheduling variables
+    current_lr = 1e-4
+    min_lr = 1e-7
+    lr_patience = 3
+    lr_counter = 0
+    best_val_loss = None
     for epoch in range(num_epochs):
+        set_trainable_layers(model, epoch, EPOCHS_HEAD)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=current_lr)
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc = validate(model, valid_loader, criterion, device)
         print(f"Epoch {epoch+1}/{num_epochs} | Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} | Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}")
@@ -64,6 +94,19 @@ def main():
             best_val_acc = val_acc
             torch.save(model.state_dict(), best_model_path)
             print(f"Best model updated and saved at epoch {epoch+1} with val_acc={val_acc:.4f}")
+        # Learning rate scheduling (after EPOCHS_HEAD)
+        if epoch >= EPOCHS_HEAD:
+            if best_val_loss is None or val_loss < best_val_loss:
+                best_val_loss = val_loss
+                lr_counter = 0
+            else:
+                lr_counter += 1
+                if lr_counter >= lr_patience:
+                    new_lr = max(current_lr * 0.95, min_lr)
+                    if new_lr < current_lr:
+                        print(f"Reducing learning rate from {current_lr:.8f} to {new_lr:.8f} at epoch {epoch+1}")
+                        current_lr = new_lr
+                    lr_counter = 0
         early_stopping(val_loss)
         if early_stopping.early_stop:
             print(f"Early stopping at epoch {epoch+1}")
