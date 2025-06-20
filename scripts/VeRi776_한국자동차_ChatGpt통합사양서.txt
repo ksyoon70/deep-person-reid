@@ -1,0 +1,97 @@
+src_dir = Path(r'E:\윤경섭\상세차종_re-id_datasets').resolve()
+vsrc_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_train').resolve()        #veri-776 dataset이 있는 곳.
+vmodel_dir = Path(r'E:\윤경섭\vmodel').resolve()
+det_dir = Path(r'E:\윤경섭\save').resolve()
+로 정의 한다.
+
+
+
+만일 src_dir, vsrc_dir 이 없으면 없다고 print를 하고 종료한다.
+옵션을 두어서 
+vmodel_dir와 det_dir 있으면 삭제하는 코드를 둔다.
+만일 vmodel_dir와 det_dir이 없으면 print 하고 생성한다.
+
+vsrc_dir 아래는 이미지 파일과 해당 json 파일이 쌍으로 존재하는데, 가끔은 쌍이 아닐 수도 있다.
+예를 들어 0081_c1s1_000075_02.jpg 및 0081_c1s1_000075_02.json 이런 식으로 이름이 존재한다.
+여기서 '_'로 나뉘어지는 첫번째 부분 위 예에서 '0081' 가 vid가 된다. 이 부분은 언제나 숫자이고 만일 파일명에 vid가 없거나 숫자가 아니면 에러를 print 한다.
+
+vsrc_dir에서 파일 이름을 읽어서 가장 큰 vid를 찾아서 그 값을 veri_max_vid에 저장한다.
+veri_max_vid의 100자리 보다 하나큰 숫자를 구하고, 예를 들어 veri_max_vid가 0769이면 그 수는 0800이 된다.
+margin = 구한숫자 - veri_max_vid으로 구한다.
+
+kvid = veri_max_vid + margin + 1 부터 시작하고,
+
+src_dir 아래에는 하위 폴더가 많이 있고, 하위 폴더의 이름 구조는 
+예를 들어 'K3_GDI_black_001'이면 'K3'는 모델이름 두번째 'GDI'는 상세모델 나머지는 색깔과 숫자이다.
+src_dir에서 하위 폴더의 이미지 파일과 json 파일을 vmodel_dir로 복사하는데,
+복사할때 src_dir의 원 위치가 있는 폴더에서 '모델'_'상세모델' 형태의 디렉토리를 만들어 그 아래에 복사한다.
+복사할때 그냥 복사하지 않고, 이미지파일 이름의 vid부분을 kvid로 바꾸고,
+json 파일은 내용을 읽어서 
+예를 들어  아래와 같은 구조로 되어 있는데,
+{
+  "version": "5.0.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "car",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          142,
+          0
+        ],
+        [
+          142,
+          117
+        ],
+        [
+          0,
+          117
+        ]
+      ],
+      "group_id": null,
+      "shape_type": "polygon",
+      "color": "black",
+      "flags": {}
+    }
+  ],
+  "imageData": null,
+  "imageHeight": 118,
+  "imageWidth": 143,
+  "imagePath": "0769_c19s1_075235_01.jpg"
+}
+imagePath 부분의 파일명을 kvid로 바꾸고 이름도 변경 하여 저장한다.
+같은 vid에 대해서는 같은 kvid가 적용어야 하고, vid가 바뀌면 kvid가 하나 증가한다.
+vmodel로 복사할 때 차량모델 폴더 여기저기서 kvid가 증가하는데, 같은 차량모델 폴더에 대하여 vid가 다르면 +1씩 다르게 kvid가 증가하도록 하라.
+
+
+src_dir에서 vmodel_dir로 복사 할때 
+복사한다고 print 를 표시하고 
+진행 과정이 '■' 형태로 증가하고, 100% 복사가 완료 되면 '■'가 40개가 되게 하고
+복사가 완료 되면 완료 되었다고 표시한다.
+
+vmodel_dir에 있는 하위 디렉토리를 순환하여 파일명들을 읽고 shuffle 랜덤하게 하고
+det_dir 하위 폴더에 복사하는데,
+'image_train' 'image_query' 'image_test' 디렉토리를 만들다.
+train_ratio = 0.8 query_ratio = 0.15 image_test = 0.05 를 기본으로 배율 만큼을  각 디렉토리로 복사한다.
+이 기준은 전체 데이터가 아니라 vmodel 모델이름 폴더 단위로 적용되도록 한다.
+복사는 항상 이미지와 json 짝으로 복사하고 짝이 맞지 않으면 error print를 한다.
+만일 각 비율로 나눗었을 때 파일 쌍(이미지, json)의 갯수가 1개 이하 소숫점이면 정수로 바꾸고, ratio가 0이면 복사하지 않는다.
+'image_test'의 복사를 가장 먼저하고 복사 갯수가 0이면 하지 않고, 소숫점 이하면 'image_query' 복사할 것을 하나 줄이고 그것을 'image_test'에 복사한다.
+동일하게 'image_query'에 동일한 규칙이 적용되고 갯수가 1개 미만 소숫점이면 'image_train'에 복사할 것을 하나 줄이고, 'image_query'에 복사한다.
+마지막으로 'image_train'에 복사한다.
+
+vmodel_dir에서 det_dir로 복사 할때도 역시
+복사한다고 print 를 표시하고 
+진행 과정이 '■' 형태로 증가하고, 100% 복사가 완료 되면 '■'가 40개가 되게 하고
+복사가 완료 되면 완료 되었다고 표시하고
+완료 메시지를 표시하고 모든 동작을 종료한다.
+
+혹시 동작에 질문이 있으면 질문하기 바란다.
+
+
+
+

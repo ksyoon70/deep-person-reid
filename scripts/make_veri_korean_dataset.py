@@ -1,227 +1,266 @@
+#!/usr/bin/env python3
+# -*- coding: utf‑8 -*-
 """
-Created on 2025년 6월 18일
-이 파일은 veri-776 dataset에 한국 차량을 추가하는 코드이다.
-vehicle_model_dataset_prepare.py로 생성된 한국차량 데이터셋을 veri-776에 id가 겹치지 않게 추가한다.
-src_dir 변수에 예를들어 VeRi\veri\image_add 가 할당되어 있고
-veri-776 데이터셋이 있는 곳을 vsrc_dir 변수에 할당 되어 있다고 하자.
-det_dir 변수에 예를 들어 \VeRi\veri\save 라고 할당 되어 있고 이곳에 추가된 데이터셋이 저장된다.
-그러면 이 코드는 src_dir의 하위 디렉토리를 검사하여 labelme에서 re-id용으로 저장한 파일을 읽어 det_dir에 id가 겹치지 않게, 속성을 추가하여 저장하는 코드이다.
-단 color 라벨 파일 list_color.txt type라벨 파일 list_type.txt은 /Veri/veri 아래에 저장되어 있다고 판단한다.
-@author:  윤경섭
+Veri‑776 ↔ 신규 차량 데이터셋 정리 스크립트 (v2)
+2025‑06‑20
+
+주요 기능
+---------
+1) --clean 옵션: vmodel_dir, det_dir 초기화(존재 시 삭제 후 생성)
+2) Veri‑776 최대 vid 분석 → kvid 시작값 산출
+3) src_dir → vmodel_dir
+   · src_dir : 한국차량이 모델별로 있는 폴더명
+   · vsrc_dir: Veri‑776이 있는 image_train 폴더명   
+   · 차량모델 폴더별로 vid → kvid 매핑 (동일 폴더 내부에서만 +1씩 증가)
+   · 이미지/JSON 이름·내용 수정, 폴더 재구조화
+4) vmodel_dir → det_dir
+   · vmodel_dir : 차량모델 별로 이미지/JSON 저장 임시 폴더
+   · dest_dir : 초종 Veri‑776에 추가로 저장 할 한국차량 데이터셋
+   · **차량모델 폴더별** train/query/test 분할 (비율: 0.80/0.15/0.05)
+   · 소수/0개 보정 규칙, 이미지·JSON 쌍 유지
+5) 모든 단계에서 진행률 바(■ 40칸) 및 오류 메시지 출력
 """
-import os,sys
-import json
-import shutil
-from typing import Set   # Python 3.8 호환 타입 힌트
-from glob import glob
+
 from pathlib import Path
-from collections import Counter, defaultdict
-from natsort import natsorted   # 사람이 읽기 좋은 자연 정렬(선택 사항)
-from typing import Iterator
+import shutil, json, random, argparse, sys
+from typing import List, Tuple
 
-# --- 0) 4자리 숫자 PID를 담을 리스트 -----------------------------
-pid_list = []          # 필요하면 set() 후 나중에 리스트 변환도 가능
-pid_seen = set()       # 중복 방지용 내부 집합
+# --------------------------------------------------
+#  사용자 기본 경로 설정 (필요 시 수정)
+# --------------------------------------------------
+src_dir    = Path(r'E:\윤경섭\상세차종_re-id_datasets').resolve()
+vsrc_dir   = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_train').resolve()
+vmodel_dir = Path(r'E:\윤경섭\vmodel').resolve()
+det_dir    = Path(r'E:\윤경섭\save').resolve()
 
-# ────────────────────────────────
-# 1.  색·종류 레퍼런스 읽기
-# ────────────────────────────────
-def load_first_tokens(txt_path: str) -> Set[str]:
-    """각 라인의 첫 번째 토큰(token\tid 형식)을 집합으로 반환"""
-    tokens: Set[str] = set()
-    with open(txt_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            tokens.add(line.split()[0])      # 탭·공백 모두 split 대응
-    return tokens
+# 분할 비율
+TRAIN_RATIO = 0.80
+QUERY_RATIO = 0.15
+TEST_RATIO  = 0.05
 
-# 프로젝트 루트(필요 시 절대경로 지정)
-BASE_DIR   = os.path.join("VeRi", "veri")
+BAR_WIDTH = 40  # 진행 막대 너비 ('■' 개수)
 
-color_path = os.path.join(BASE_DIR, "list_color.txt")
-type_path = os.path.join(BASE_DIR, "list_type.txt")
-# ---------- 존재 여부 검사 ----------
-for p in (color_path, type_path):
-    if not os.path.isfile(p):
-        sys.stderr.write(f"[ERROR] 필요한 파일이 없습니다: {p}\n")
-        sys.exit(1)                       # 비정상 종료 (exit code 1)
+# --------------------------------------------------
+#  공통 유틸리티
+# --------------------------------------------------
+def eprint(msg: str):
+    print(f"[ERROR] {msg}", file=sys.stderr)
 
-COLOR_SET = load_first_tokens(color_path)
-TYPE_SET  = load_first_tokens(type_path)
+def progress(current: int, total: int):
+    done = int(BAR_WIDTH * current / total)
+    bar  = '■' * done + ' ' * (BAR_WIDTH - done)
+    pct  = f"{100*current/total:6.2f}%"
+    print(f"\r[{bar}] {pct}", end='', flush=True)
 
-# ────────────────────────────────
-# 1.  JSON 1개 처리
-# ────────────────────────────────
-def process_one_json(json_path: str, dest_dir: str, pid_list: list, pid_seen : set) -> None:
-    """json_path를 변환·저장하고, 사용한 id를 반환"""
-    with open(json_path, encoding="utf-8") as f:
+def finish_bar():
+    print(f"\r[{'■'*BAR_WIDTH}] 100.00%")
+
+def ensure(path: Path, label: str):
+    if not path.exists():
+        eprint(f"{label}({path}) 없음 → 생성")
+        path.mkdir(parents=True, exist_ok=True)
+
+def require(path: Path, label: str):
+    if not path.exists():
+        eprint(f"{label}({path}) 없음 → 종료")
+        sys.exit(1)
+
+def is_image(p: Path):
+    return p.suffix.lower() in {'.jpg', '.jpeg', '.png'}
+
+def json_for(img: Path):
+    return img.with_suffix('.json')
+
+def extract_vid(name: str):
+    try:
+        return int(name.split('_', 1)[0])
+    except Exception:
+        return None
+
+def next_hundred(n: int):
+    return ((n // 100) + 1) * 100
+
+def zpad(num: int, width: int=4):
+    return str(num).zfill(max(width, len(str(num))))
+
+# --------------------------------------------------
+#  인자 파싱
+# --------------------------------------------------
+parser = argparse.ArgumentParser(
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    description="신규 차량 데이터셋(상세차종) → Veri 형식 변환 유틸리티"
+)
+parser.add_argument("-c", "--clean", action="store_true",
+                    help="시작 전에 vmodel_dir, det_dir 전체를 삭제하고 새로 생성")
+args = parser.parse_args()
+
+# --------------------------------------------------
+#  0. 디렉터리 준비 / 초기화
+# --------------------------------------------------
+require(src_dir,  "src_dir")
+require(vsrc_dir, "vsrc_dir")
+
+args.clean= True #일단 폴더 삭제하도록 함.
+
+if args.clean:
+    for d in (vmodel_dir, det_dir):
+        if d.exists():
+            print(f"[clean] {d} 전체 삭제 중…")
+            shutil.rmtree(d)
+for d in (vmodel_dir, det_dir):
+    ensure(d, str(d))
+
+# --------------------------------------------------
+#  1. Veri‑776 최대 vid 파악
+# --------------------------------------------------
+max_vid = -1
+for img in vsrc_dir.iterdir():
+    if not is_image(img): continue
+    vid = extract_vid(img.name)
+    if vid is None:
+        eprint(f"vid 추출 실패: {img.name}")
+        continue
+    max_vid = max(max_vid, vid)
+
+if max_vid < 0:
+    eprint("vsrc_dir 에서 유효 이미지 없음 → 종료")
+    sys.exit(1)
+
+pivot   = next_hundred(max_vid)
+margin  = pivot - max_vid
+kvid_seed = max_vid + margin + 1
+
+print("=== Veri‑776 정보 ===")
+print(f"  max vid  : {max_vid:04d}")
+print(f"  pivot    : {pivot:04d}")
+print(f"  margin   : {margin}")
+print(f"  kvid seed: {kvid_seed:04d}")
+print("=====================")
+
+# --------------------------------------------------
+#  2. src_dir → vmodel_dir (복사 · kvid 매핑)
+# --------------------------------------------------
+print("\n[1단계] src_dir → vmodel_dir 복사 시작")
+
+files_to_copy: List[Tuple[Path, Path, Path, Path]] = []
+global_kvid = kvid_seed
+
+for folder in sorted(p for p in src_dir.rglob('*') if p.is_dir()):
+    parts = folder.name.split('_')
+    if len(parts) < 2:
+        eprint(f"폴더명 구조 오류(스킵): {folder}")
+        continue
+    model, detail = parts[0], parts[1]
+    dest_sub = vmodel_dir / f"{model}_{detail}"
+    dest_sub.mkdir(parents=True, exist_ok=True)
+
+    # --- 폴더별 vid→kvid 매핑 (독립적) ---
+    local_vid_map = {}
+    local_kvid    = global_kvid
+
+    # 이미지 정렬 → vid 안정적 매핑
+    imgs = sorted(p for p in folder.iterdir() if is_image(p))
+    for img in imgs:
+        jfile = json_for(img)
+        if not jfile.exists():
+            eprint(f"JSON 없음(스킵): {img}")
+            continue
+        vid = extract_vid(img.name)
+        if vid is None:
+            eprint(f"vid 추출 실패(스킵): {img.name}")
+            continue
+
+        # 새 kvid 결정 (폴더 내 vid 단위 +1)
+        if vid not in local_vid_map:
+            local_vid_map[vid] = local_kvid
+            local_kvid += 1    # 같은 폴더에서만 증가
+        new_vid = local_vid_map[vid]
+
+        rest     = img.name.split('_', 1)[1]
+        new_name = f"{zpad(new_vid)}_{rest}"
+        dst_img  = dest_sub / new_name
+        dst_json = dst_img.with_suffix('.json')
+        files_to_copy.append((img, jfile, dst_img, dst_json))
+
+    # 폴더 완료 → global_kvid 최신화
+    global_kvid = local_kvid
+
+# 실제 복사
+total = len(files_to_copy)
+print(f"  복사 예정 쌍: {total}")
+for idx, (src_img, src_j, dst_img, dst_j) in enumerate(files_to_copy, 1):
+    shutil.copy2(src_img, dst_img)
+
+    # JSON 갱신
+    with open(src_j, encoding='utf-8') as f:
         data = json.load(f)
-
-    # ---------- label 정리 ----------
-    for shape in data.get("shapes", []):
-        label = shape.get("label", "")
-        parts = label.split("_")
-        if len(parts) == 2:
-            vtype, color = parts          # 형식: type_color
-            if color in COLOR_SET and vtype in TYPE_SET:
-                shape["label"] = vtype
-                shape["color"] = color
-
-    # ---------- 파일명(ID) 갱신 ----------
-    base_name = os.path.basename(json_path)           # 0001_xxx.json
-    stem, _ = os.path.splitext(base_name)             # 0001_xxx
-    name_parts = stem.split("_")
-
-    if name_parts[0].isdigit():
-        pid = int(name_parts[0])  # 숫자 ID가 있을 때만
-        if pid in pid_seen:
-            new_id = (pid_list[-1] if pid_list else 1)
-            if not pid_list:
-                pid_list.add(1) 
-        else:
-            max_id = (pid_list[-1] if pid_list else 0) + 1                  # 0001 → 4자리 유지
-            new_id  = max_id
-            pid_seen.add(pid)
-            pid_list.append(max_id)
-        width   = len(name_parts[0])
-        id_str  = str(new_id).zfill(width)
-        name_parts[0] = id_str
-
-        new_stem       = "_".join(name_parts)
-        new_json_name  = new_stem + ".json"
-
-        # imagePath 수정
-        img_name = data.get("imagePath", "")
-        if img_name:
-            img_stem, img_ext = os.path.splitext(img_name)
-            img_parts         = img_stem.split("_")
-            if img_parts and img_parts[0].isdigit():
-                img_parts[0]   = id_str
-                new_img_name   = "_".join(img_parts) + img_ext
-                data["imagePath"] = new_img_name
-            else:
-                new_img_name = img_name
-        else:
-            new_img_name = ""
-
-    else:                                            # 숫자 ID가 없으면 그대로
-        new_json_name  = base_name
-        new_img_name   = data.get("imagePath", "")
-
-    # ---------- JSON 저장 ----------
-    dst_json_path = os.path.join(dest_dir, new_json_name)
-    with open(dst_json_path, "w", encoding="utf-8") as f:
+    data['imagePath'] = dst_img.name
+    with open(dst_j, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    # ---------- 이미지 복사 ----------
-    if new_img_name:
-        src_img_path = os.path.join(os.path.dirname(json_path),img_name)
-        if os.path.exists(src_img_path):
-            shutil.copy2(src_img_path,
-            os.path.join(dest_dir, new_img_name))
+    progress(idx, total)
+finish_bar()
+print("\n[1단계] 완료")
 
-    return
+# --------------------------------------------------
+#  3. vmodel_dir → det_dir  (모델 폴더별 분할)
+# --------------------------------------------------
+print("\n[2단계] vmodel_dir → det_dir 분할 복사 시작")
 
-def scan_folders(root: Path) -> Iterator[Path]:
-    """root 이하 모든 폴더를 yield.
-    하위 폴더가 없으면 root 자체를 한 번 yield.
-    """
-    root = root.resolve()
-    yielded = False
+train_dir = det_dir / 'image_train'
+query_dir = det_dir / 'image_query'
+test_dir  = det_dir / 'image_test'
+for d in (train_dir, query_dir, test_dir):
+    d.mkdir(parents=True, exist_ok=True)
 
-    # os.walk() 는 내부적으로 os.scandir()를 사용 → DirEntry.is_dir() 캐시로 빠름
-    for dirpath, dirnames, _ in os.walk(root):
-        for dn in dirnames:          # 파일 목록(filenames)은 무시
-            yielded = True
-            yield Path(dirpath) / dn
+# 전체 진행률을 위해 총 쌍 수 계산
+all_pairs: List[Tuple[Path, Path]] = [
+    (img, json_for(img))
+    for img in vmodel_dir.rglob('*') if is_image(img)
+    if json_for(img).exists()
+]
+grand_total = len(all_pairs)
+done = 0
 
-    if not yielded:                 # 하위 폴더가 하나도 없었다면
-        yield root
+def copy_batch(batch: List[Tuple[Path, Path]], dest: Path):
+    global done
+    for src_img, src_js in batch:
+        shutil.copy2(src_img, dest / src_img.name)
+        shutil.copy2(src_js,  dest / src_js.name)
+        done += 1
+        progress(done, grand_total)
 
-def iter_json_sorted(folder: Path, *, natural=False):
-    """folder 안의 *.json 파일을 이름 기준으로 정렬해 yield"""
-    json_paths = list(folder.glob('*.json'))
+# 차량모델 폴더 단위 루프
+for folder in sorted(p for p in vmodel_dir.iterdir() if p.is_dir()):
+    pairs = [
+        (img, json_for(img))
+        for img in folder.iterdir() if is_image(img)
+        if json_for(img).exists()
+    ]
+    if not pairs:
+        continue
+    random.shuffle(pairs)
 
-    # ① 알파벳/사전 순
-    if not natural:
-        json_paths = sorted(json_paths, key=lambda p: p.name)        # 또는 p.stem
+    N = len(pairs)
+    test_cnt  = int(N * TEST_RATIO)
+    query_cnt = int(N * QUERY_RATIO)
+    train_cnt = N - test_cnt - query_cnt
 
-    # ② 사람이 읽기 좋은 자연 정렬(파일1, 파일2, … 파일10)
-    else:
-        json_paths = natsorted(json_paths, key=lambda p: p.name)
+    # 보정
+    if test_cnt == 0 and query_cnt > 0:
+        query_cnt -= 1; test_cnt += 1
+    elif test_cnt == 0 and train_cnt > 0:
+        train_cnt -= 1; test_cnt += 1
+    if query_cnt == 0 and train_cnt > 0:
+        train_cnt -= 1; query_cnt += 1
 
-    for p in json_paths:
-        yield p
+    assert test_cnt + query_cnt + train_cnt == N
 
+    # 순서: test → query → train
+    copy_batch(pairs[:test_cnt],                  test_dir)
+    copy_batch(pairs[test_cnt:test_cnt+query_cnt], query_dir)
+    copy_batch(pairs[test_cnt+query_cnt:],         train_dir)
 
-def count_json_per_folder(root_dir):
-    """
-    root_dir 이하 모든 디렉터리를 재귀 탐색해
-    {폴더 경로(Path): json 개수(int)} 딕셔너리를 반환.
-    """
-    root = Path(root_dir).resolve()
-    counter = Counter()
-
-    # ① 모든 .json 경로를 재귀적으로 찾는다
-    for json_path in root.rglob("*.json"):
-        folder = json_path.parent            # json이 속한 디렉터리
-        counter[folder] += 1
-
-    return counter
-
-# ────────────────────────────────
-# 3.  실행
-# ────────────────────────────────
-def main() -> None:
-
-    #json 데이터들이 있는 폴더
-    src_dir = Path(r'E:\윤경섭\vehicle_model\train').resolve()
-    vsrc_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_train').resolve()        #veri-776 dataset이 있는 곳.
-    det_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\save').resolve()
-
-    os.makedirs(det_dir, exist_ok=True)
-
-    all_json = count_json_per_folder(src_dir)
-    total = 0
-    for folder, n in all_json.items():
-        rel = folder.relative_to(src_dir).as_posix() or "."   # 루트 자체는 "."
-        print(f"{rel:30s} : {n}개")
-        total += n
-    if total == 0:
-        print('변환할 파일이 없습니다.')
-        exit(0)
-
-    broken_json = defaultdict(list)
-    idx = 0
-    bar_len = 40
-
-    # veri-776 데이터셋 추가
-    for folder in scan_folders(vsrc_dir):
-        pid_seen.clear() 
-        for json_file in iter_json_sorted(folder, natural=True):
-            idx += 1           
-            try:
-                process_one_json(json_file, det_dir,pid_list,pid_seen)
-            except Exception as e:           # JSON 파싱 실패 기록
-                broken_json[folder].append(json_file.name)
-
-    # 한국차량 데이터셋 추가
-    for folder in scan_folders(src_dir):
-        pid_seen.clear() 
-        for json_file in iter_json_sorted(folder, natural=True):
-            idx += 1           
-            try:
-                process_one_json(json_file, det_dir,pid_list,pid_seen)
-                # 진행상황 막대그래프
-                done = int(bar_len * idx / total)
-                bar = '■' * done + '-' * (bar_len - done)
-                print(f'진행중: [{bar}] {idx}/{total}', end='\r')
-            except Exception as e:           # JSON 파싱 실패 기록
-                broken_json[folder].append(json_file.name)
-
-    print(f"완료: '{det_dir}' 폴더에 변환-복사된 파일이 저장되었습니다.")
-
-if __name__ == "__main__":
-    main()
+finish_bar()
+print("\n[2단계] 완료")
+print("\n=== 모든 작업이 정상적으로 끝났습니다 ===")
