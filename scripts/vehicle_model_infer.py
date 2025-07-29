@@ -88,7 +88,7 @@ def main():
     print(f"결과가 저장될 폴더: {result_dir.resolve()}")
 
     # efficientnet_vehicle_model_best가 포함된 pth 파일 자동 탐색
-    model_files = list(model_dir.glob('efficientnet_vehicle_model_best*.pth'))
+    model_files = list(model_dir.glob('efficientnet_vehicle_best*.pth'))
     if not model_files:
         print("Error: efficientnet_vehicle_model_best로 시작하는 .pth 파일이 scripts 폴더에 없습니다.")
         sys.exit(1)

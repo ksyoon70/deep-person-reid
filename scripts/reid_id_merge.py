@@ -192,8 +192,8 @@ def count_json_per_folder(root_dir):
 def main() -> None:
 
     #json 데이터들이 있는 폴더
-    src_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_add').resolve()
-    det_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\save').resolve()
+    src_dir = Path(r'E:\윤경섭\상세차종_re-id_datasets\싼타페_DM_black_001').resolve()
+    det_dir = Path(r'E:\윤경섭\id_merged').resolve()
 
     os.makedirs(det_dir, exist_ok=True)
 
@@ -209,7 +209,7 @@ def main() -> None:
 
     merge_id  = get_min_id(src_dir)
 
-    merge_id = 127
+    #merge_id = 127
 
     if merge_id == 0:
         print(f'{src_dir} 에서 id를 얻을 수 없습니다.')
