@@ -171,7 +171,7 @@ class VeRi(ImageDataset):
                     #camid = self.dataset_name + "_" + str(camid)
                 data.append((img_path, pid, camid, 0, color_id, type_id))
         else:
-            
+            type_list = []
             if os.path.exists(self.color_path):
                 self.colormap = VeRi.load_map(self.color_path)
             else:
@@ -179,6 +179,7 @@ class VeRi(ImageDataset):
                 sys.exit(0)
             if os.path.exists(self.type_path):
                 self.typemap = VeRi.load_map(self.type_path)
+                type_list = list(self.typemap.keys())
             else:
                 print("file {} exists. check the folder :".format(self.type_path))
                 sys.exit(0)
@@ -201,7 +202,7 @@ class VeRi(ImageDataset):
                         jdata = json.load(f)
                         for shape in jdata.get("shapes", []):
                             label = shape.get("label", "")
-                            if not 'window' in label:
+                            if  label in type_list:  #['car', 'truck', 'bus','motorcycle' ,'human']
                                 color = shape.get('color')
                                 type_id = self.typemap.get(label) if label and self.typemap else None
                                 color_id = self.colormap.get(color) if color and self.colormap else None
@@ -212,6 +213,9 @@ class VeRi(ImageDataset):
                     pid = pid2label[pid]
                     #pid = self.dataset_name + "_" + str(pid)
                     #camid = self.dataset_name + "_" + str(camid)
+                if color_id < 0 or type_id < 0:
+                    print(f"error color_id:{color_id} type_id:{type_id} json_file:{json_file} img_path:{img_path}") #이미지 파일과 json 파일의 color_id와 type_id가 정의되지 않은 경우
+                    continue
                 data.append((img_path, pid, camid,0,color_id, type_id))
 
         return data

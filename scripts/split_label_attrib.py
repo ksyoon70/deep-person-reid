@@ -175,8 +175,8 @@ def count_json_per_folder(root_dir):
 def main() -> None:
 
     #json 데이터들이 있는 폴더
-    src_dir = Path(r'E:\윤경섭\vehicle_model\train').resolve()
-    det_dir = Path(r'D:\SPB_Data\deep-person-reid\VeRi\veri\save').resolve()
+    src_dir = Path(r'E:\윤경섭\save\image_train').resolve()
+    det_dir = Path(r'E:\윤경섭\result').resolve()
 
     os.makedirs(det_dir, exist_ok=True)
 

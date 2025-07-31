@@ -23,7 +23,7 @@ def load_first_tokens(txt_path: str) -> Set[str]:
 def main() -> None:
     # (1) 라벨 파일들이 있는 최상위 폴더
     src_dir = os.path.normpath(
-        r'E:\강은진\022'
+        r'D:\SPB_Data\deep-person-reid\VeRi\veri\image_train'
     )
 
     # (2) VeRi 기준 색·차종 레퍼런스
