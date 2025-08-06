@@ -72,7 +72,7 @@ class ImageSoftmaxEngine(Engine):
         self.register_model('model', model, optimizer, scheduler)
 
         self.criterion = CrossEntropyLoss(
-            num_classes=self.datamanager.num_train_pids + self.datamanager.num_color_ids + self.datamanager.num_type_ids if self.datamanager.targets[0] == 'veri' else self.datamanager.num_train_pids,
+            num_classes=self.datamanager.num_train_pids + self.datamanager.num_color_ids + self.datamanager.num_type_ids if self.datamanager.targets[0] == 'veri' and self.datamanager.output_usage == 'mixture' else self.datamanager.num_train_pids,
             use_gpu=self.use_gpu,
             label_smooth=label_smooth
         )
@@ -125,10 +125,15 @@ class ImageSoftmaxEngine(Engine):
                 'type': logits_type
             }
 
-            loss_pid = self.compute_loss(self.criterion, output['pid'], pids)
-            loss_color = self.compute_loss(self.criterion, output['color'], colors)
-            loss_type = self.compute_loss(self.criterion, output['type'], typeids)
-            loss = loss_pid + loss_color + loss_type
+            
+            if self.datamanager.output_usage == 'mixture':
+                loss_pid = self.compute_loss(self.criterion, output['pid'], pids)
+                loss_color = self.compute_loss(self.criterion, output['color'], colors)
+                loss_type = self.compute_loss(self.criterion, output['type'], typeids)
+                loss = loss_pid + loss_color + loss_type
+            else:
+                loss_pid = self.compute_loss(self.criterion, output['pid'], pids)
+                loss = loss_pid # pid만 사용하는 경우
         else:
             loss = self.compute_loss(self.criterion, outputs, pids)
 
@@ -138,11 +143,16 @@ class ImageSoftmaxEngine(Engine):
 
         # 6) 로그/모니터링용 loss_summary
         if self.datamanager.targets[0] == 'veri':
-            acc_pid = metrics.accuracy(output['pid'], pids)[0].item()
-            acc_color = metrics.accuracy(output['color'], colors)[0].item()
-            acc_type = metrics.accuracy(output['type'], typeids)[0].item()
-            acc_total = acc_pid + acc_color + acc_type
-            acc_mean = acc_total / 3.0  # 세 accuracy의 평균
+            
+            if self.datamanager.output_usage == 'mixture':
+                acc_pid = metrics.accuracy(output['pid'], pids)[0].item()
+                acc_color = metrics.accuracy(output['color'], colors)[0].item()
+                acc_type = metrics.accuracy(output['type'], typeids)[0].item()
+                acc_total = acc_pid + acc_color + acc_type
+                acc_mean = acc_total / 3.0  # 세 accuracy의 평균
+            else:
+                acc_pid = metrics.accuracy(output['pid'], pids)[0].item()
+                acc_mean = acc_pid # pid만 사용하는 경우
             loss_summary = {
                 'loss': loss.item(),
                 'acc': acc_mean

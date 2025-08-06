@@ -306,6 +306,14 @@ class OSNet(nn.Module):
         self.loss = loss
         self.feature_dim = feature_dim
 
+        # skip classifier 정의
+        self.skip_classifier = kwargs.get('skip_classifier', None)
+
+        if self.skip_classifier is not None:
+            print('Skip classifier: {}'.format(self.skip_classifier))
+        else:
+            print('Error! Skip classifier is not defined.')
+
         # convolutional backbone
         self.conv1 = ConvLayer(3, channels[0], 7, stride=2, padding=3, IN=IN)
         self.maxpool = nn.MaxPool2d(3, stride=2, padding=1)
@@ -427,9 +435,12 @@ class OSNet(nn.Module):
         v = v.view(v.size(0), -1)
         if self.fc is not None:
             v = self.fc(v)
-        #if not self.training:
-        #    return v
-        y = self.classifier(v)
+        if self.training:  #if not self.training:  self.training은 OSNet이 직접 정의한 속성이 아니라, PyTorch의 nn.Module에서 상속받은 내장 속성이다.
+            y = self.classifier(v)
+        elif not self.skip_classifier:  
+            y = self.classifier(v)
+        else:
+            return v
         if self.loss == 'softmax':
             return y
         elif self.loss == 'triplet':

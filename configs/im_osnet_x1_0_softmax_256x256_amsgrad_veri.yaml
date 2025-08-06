@@ -20,17 +20,18 @@ loss:
 train:
   optim: 'amsgrad'
   lr: 0.0015
-  max_epoch: 70
+  max_epoch: 100
   batch_size: 64
-  fixbase_epoch: 10
+  fixbase_epoch: 15
   open_layers: ['classifier']
-  lr_scheduler: 'single_step'
-  stepsize: [60]
+  lr_scheduler: 'multi_step'
+  stepsize: [20, 40, 60]
+  gamma: 0.2
 
 test:
   batch_size: 64
   dist_metric: 'euclidean'
   normalize_feature: False
   evaluate: False
-  eval_freq: -1
+  eval_freq: 5
   rerank: False

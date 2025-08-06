@@ -62,7 +62,7 @@ class VeRi(ImageDataset):
 
         train = self.process_dir(self.train_dir,self.train_xml_file)
         query = self.process_dir(self.query_dir, self.query_xml_file, is_train=False)
-        gallery = self.process_dir(self.gallery_dir, self.test_xml_file, is_train=True)
+        gallery = self.process_dir(self.gallery_dir, self.test_xml_file, is_train=False)
         
         super(VeRi, self).__init__(train, query, gallery, **kwargs)
         #추가로 color_id 와 type_id 갯수를 계산을 한다.

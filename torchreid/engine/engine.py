@@ -41,6 +41,17 @@ class Engine(object):
         self._optims = OrderedDict()
         self._scheds = OrderedDict()
 
+        # 클래스에 학습 계획을 속성으로 추가
+        self.unfreeze_schedule = {
+            0: ['classifier'],
+            10: ['classifier', 'conv5'],
+            20: ['classifier', 'conv5', 'conv4'],
+            30: ['classifier', 'conv5', 'conv4', 'conv3'],
+            40: ['classifier', 'conv5', 'conv4', 'conv3', 'conv2'],
+            50: ['classifier', 'conv5', 'conv4', 'conv3', 'conv2', 'conv1'],
+            60 : 'all'  # 'all'로 설정하면 모든 레이어를 학습 가능하게 설정
+        }
+
     def register_model(self, name='model', model=None, optim=None, sched=None):
         if self.__dict__.get('_models') is None:
             raise AttributeError(
@@ -187,6 +198,8 @@ class Engine(object):
         self.max_epoch = max_epoch
         print('=> Start training')
 
+        rank_acc = 0.95  # 예시로 Rank-1 정확도가 95%를 초과하면 훈련을 중단
+
         for self.epoch in range(self.start_epoch, self.max_epoch):
             self.train(
                 print_freq=print_freq,
@@ -208,6 +221,11 @@ class Engine(object):
                     ranks=ranks
                 )
                 self.save_model(self.epoch, rank1, save_dir)
+
+                if rank1 > rank_acc:  # 예시로 Rank-1 정확도가 95%를 초과하면 훈련을 중단
+                    print(f"Epoch {self.epoch + 1}: Validation Rank-1 Accuracy ({rank1:.4f}) has exceeded {rank_acc:.4f}%.")
+                    print("Stopping training early.")
+                    break  # for 반복문을 탈출하여 훈련을 종료
 
         if self.max_epoch > 0:
             print('=> Final test')
@@ -238,6 +256,16 @@ class Engine(object):
         self.two_stepped_transfer_learning(
             self.epoch, fixbase_epoch, open_layers
         )
+
+        # 현재 epoch가 학습 계획에 있는지 확인
+        if self.epoch in self.unfreeze_schedule:
+            layers_to_open = self.unfreeze_schedule[self.epoch]
+            print(f"Epoch {self.epoch}: Unfreezing layers: {layers_to_open}")
+            
+            # 1. 학습할 레이어 설정
+            self.set_trainable_layers(layers_to_open)
+            
+        # =================== 핵심 수정 부분 끝 =====================
 
         self.num_batches = len(self.train_loader)
         end = time.time()
@@ -483,3 +511,25 @@ class Engine(object):
             open_specified_layers(model, open_layers)
         else:
             open_all_layers(model)
+
+    # Engine 클래스 내부에 추가할 헬퍼 함수 예시
+    def set_trainable_layers(self, layers_to_open):
+        """
+        모델의 특정 레이어만 학습 가능하도록 설정합니다.
+        """
+        # 'all'이 입력되면 모든 파라미터를 학습 가능하게 설정
+        if layers_to_open == 'all':
+            for param in self.model.parameters():
+                param.requires_grad = True
+            return
+
+        # 우선 모든 파라미터를 고정
+        for param in self.model.parameters():
+            param.requires_grad = False
+
+        # 열어줄 레이어 이름에 해당하는 파라미터만 학습 허용
+        for name, param in self.model.named_parameters():
+            for layer_key in layers_to_open:
+                if layer_key in name:
+                    param.requires_grad = True
+                    break # 해당 파라미터는 학습 설정했으므로 다음 파라미터로 넘어감

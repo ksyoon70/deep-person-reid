@@ -49,7 +49,8 @@ class VehicleImageDataManager(DataManager):
         cuhk03_classic_split=False,
         market1501_500k=False,
         color_list_file='VeRi/veri/list_color.txt',
-        type_list_file='VeRi/veri/list_type.txt'
+        type_list_file='VeRi/veri/list_type.txt',
+        output_usage='feature'  #feature or mixture (classification and feature)
     ):
         # 먼저 부모 클래스(ImageDataManager)의 __init__을 호출
         super(VehicleImageDataManager, self).__init__(
@@ -78,13 +79,14 @@ class VehicleImageDataManager(DataManager):
                 cuhk03_classic_split=cuhk03_classic_split,
                 market1501_500k=market1501_500k,
                 color_list_file=color_list_file,
-                type_list_file=type_list_file
+                type_list_file=type_list_file,
             )
             trainset.append(trainset_)
         trainset = sum(trainset)
 
         self._num_train_pids = trainset.num_train_pids
         self._num_train_cams = trainset.num_train_cams
+        self.output_usage = output_usage
 
         if hasattr(trainset, 'num_color_ids'):
             self._num_color_ids = trainset.num_color_ids
@@ -147,7 +149,8 @@ class VehicleImageDataManager(DataManager):
                     cuhk03_classic_split=cuhk03_classic_split,
                     market1501_500k=market1501_500k,
                     color_list_file=color_list_file,
-                    type_list_file=type_list_file
+                    type_list_file=type_list_file,
+                    output_usage=output_usage
                 )
                 trainset_t.append(trainset_t_)
             trainset_t = sum(trainset_t)
@@ -198,7 +201,8 @@ class VehicleImageDataManager(DataManager):
                 cuhk03_classic_split=cuhk03_classic_split,
                 market1501_500k=market1501_500k,
                 color_list_file=color_list_file,
-                type_list_file=type_list_file
+                type_list_file=type_list_file,
+                output_usage=output_usage
             )
             self.test_loader[name]['query'] = torch.utils.data.DataLoader(
                 queryset,
@@ -222,7 +226,8 @@ class VehicleImageDataManager(DataManager):
                 cuhk03_classic_split=cuhk03_classic_split,
                 market1501_500k=market1501_500k,
                 color_list_file=color_list_file,
-                type_list_file=type_list_file
+                type_list_file=type_list_file,
+                output_usage=output_usage
             )
             self.test_loader[name]['gallery'] = torch.utils.data.DataLoader(
                 galleryset,

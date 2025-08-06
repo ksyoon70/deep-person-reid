@@ -41,6 +41,7 @@ def get_default_config():
     cfg.veri = CN()
     cfg.veri.color_class_filename = ''
     cfg.veri.type_class_filename = ''
+    cfg.veri.output_usage = 'feature'  # feature or mixture (classification and feature)
 
     # sampler
     cfg.sampler = CN()
@@ -172,6 +173,7 @@ def veri_imagedata_kwargs(cfg):
         'market1501_500k': cfg.market1501.use_500k_distractors,
         'color_list_file': cfg.veri.color_class_filename,
         'type_list_file' : cfg.veri.type_class_filename,
+        'output_usage': cfg.veri.output_usage  # feature or mixture
     }
 
 def videodata_kwargs(cfg):

@@ -93,6 +93,8 @@ def reset_config(cfg, args):
         cfg.veri.color_class_filename = args.color_label
     if args.type_label:
         cfg.veri.type_class_filename = args.type_label
+    if args.output_usage:
+        cfg.veri.output_usage = args.output_usage # feature or mixture by 윤경섭 25.08.01
 
 
 def check_cfg(cfg):
@@ -105,7 +107,7 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument('--train',
+    parser.add_argument('--train',      #train 여부의 옵션. True 로 하면 train하고, False 로 하면 inference함
                     type=lambda x: x.lower() in ['true', '1', 'yes'],
                     default=False)
     parser.add_argument(
@@ -141,6 +143,9 @@ def main():
     parser.add_argument(
         '--type_label', type=str, default='', help='path to type label file'
     )
+    parser.add_argument(
+        '--output_usage', type=str, default='feature', help='model output usage (feature or mixture)'
+    )
     #-----------------------------------------------------------------------
     #이후의 부분은 옵션 처리
     parser.add_argument(
@@ -161,7 +166,7 @@ def main():
     set_random_seed(cfg.train.seed)
     check_cfg(cfg)
 
-    log_name = 'test.log' if cfg.test.evaluate else 'train.log'
+    log_name = 'test.log' if cfg.test.evaluate else 'train.log'  # configfile xxxx.yaml 내 test: evaluate: True/False 에 따라 train.log 또는 test.log로 설정
     log_name += time.strftime('-%Y-%m-%d-%H-%M-%S')
     sys.stdout = Logger(osp.join(cfg.data.save_dir, log_name))
 
@@ -177,10 +182,11 @@ def main():
     print('Building model: {}'.format(cfg.model.name))
     model = torchreid.models.build_model(
         name=cfg.model.name,
-        num_classes= (datamanager.num_train_pids + datamanager.num_color_ids + datamanager.num_type_ids) if cfg.data.root == 'VeRi' else datamanager.num_train_pids,
+        #veri 데이터셋인 경우이고 output_usage가 mixture 이면 색·종류 레퍼런스 추가 하고 그 외에는 pid만 사용
+        num_classes= (datamanager.num_train_pids + datamanager.num_color_ids + datamanager.num_type_ids) if cfg.data.root == 'VeRi' and cfg.veri.output_usage == 'mixture' else datamanager.num_train_pids,
         loss=cfg.loss.name,
         pretrained=cfg.model.pretrained,
-        use_gpu=cfg.use_gpu
+       **{'use_gpu':cfg.use_gpu, 'skip_classifier': False if cfg.data.root == 'VeRi' and cfg.veri.output_usage == 'mixture' else True } # cfg를 추가로 넘겨 준다. 25.05.07
     )
 
     num_params, flops = compute_model_complexity(

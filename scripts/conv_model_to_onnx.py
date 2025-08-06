@@ -47,11 +47,12 @@ class CustomModel(nn.Module):
         output = x_out / sqrt_sum
         
         return output
-
-model_name = 'resnet18'
+model_name = 'osnet_x1_0'
+#model_name = 'resnet18'
 # Load the OSNet model
-model = torchreid.models.build_model(name=model_name, num_classes=1000)
-torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\resnet18_128x64__market1501_softmax\model\model.pth.tar-40')
+model = torchreid.models.build_model(name=model_name, num_classes=512)
+#torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\resnet18_128x64__market1501_softmax\model\model.pth.tar-40')
+torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\osnet_x1_0_veri_softmax\model\\model.pth.tar-50')
 
 
 # Custom Model 생성 (Global Average Pooling을 Average Pooling으로 교체하고 추가 연산 적용)
@@ -62,7 +63,7 @@ if model_name == 'resnet18':
 model.eval()
 
 # Create dummy input tensor
-dummy_input = torch.randn(1, 3, 128,64)
+dummy_input = torch.randn(1, 3, 256,256)
 
 # Export the model to ONNX
 #torch.onnx.export(model, dummy_input, 'feature.onnx', export_params=True, opset_version=11)
