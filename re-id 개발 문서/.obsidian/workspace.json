@@ -9,20 +9,6 @@
         "dimension": 71.76395939086294,
         "children": [
           {
-            "id": "d58094d3599a1b2d",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Re-ID 개발 문서.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Re-ID 개발 문서"
-            }
-          },
-          {
             "id": "a9bc3c3347ac416a",
             "type": "leaf",
             "state": {
@@ -36,8 +22,7 @@
               "title": "Re-ID 개발 문서"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       },
       {
         "id": "f611e531f200c44d",
@@ -111,7 +96,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "d2f4ebb94f96ed86",
@@ -193,6 +179,7 @@
   },
   "left-ribbon": {
     "hiddenItems": {
+      "bases:새 베이스 생성하기": false,
       "switcher:빠른 전환기 열기": false,
       "graph:그래프 뷰 열기": false,
       "canvas:새 캔버스 만들기": false,
@@ -201,7 +188,7 @@
       "command-palette:명령어 팔레트 열기": false
     }
   },
-  "active": "a9bc3c3347ac416a",
+  "active": "5f46f6011278670c",
   "lastOpenFiles": [
     "Re-ID 개발 문서.md",
     "Attached files/Pasted image 20250806111738.png",

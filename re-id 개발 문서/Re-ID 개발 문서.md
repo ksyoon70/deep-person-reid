@@ -119,6 +119,173 @@ onnx_output_path = 'feature.onnx'
 
 이를 설정하고 수행을 하면 onnx 파일이 생성된다.
 
+# 5. yolo v8 onnx batch 변환
+yolo v8 onnx 파일로 배치 변환을 하려면 **export_yolo2onnx_with_batch_efficientNMS.py** 파일을 사용한다.
+이 파일은
+YOLOv8 PyTorch 모델(model.pt)을 TensorRT 추론에 최적화된 ONNX 모델로 변환하는 자동화 파이프라인입니다.
+
+스크립트의 전체적인 기능은 원본 PyTorch 모델에 동적 배치 크기를 적용하고, 모델을 경량화한 뒤, TensorRT의 고성능 NMS(Non-Maximum Suppression) 플러그인을 그래프에 직접 삽입하여 후처리까지 포함된 최종 ONNX 파일을 만드는 것입니다.
+
+코드는 아래와 같다.
+
+import os
+import torch
+from ultralytics import YOLO
+import onnx
+from onnxsim import simplify
+import onnx_graphsurgeon as gs
+import numpy as np
+
+### --- 1. 설정 ---
+PT_FILE = "model.pt"  # 입력할 YOLOv8 Pytorch 모델 파일
+TEMP_ONNX = "temp_model.onnx" # 중간 과정에서 생성될 임시 ONNX 파일
+SIMPLE_ONNX = "model_simplified.onnx"
+FINAL_ONNX = "model_with_nms.onnx" # 최종 결과물
+
+### NMS 플러그인 속성
+MAX_OUTPUT_BOXES = 100
+SCORE_THRESHOLD = 0.25
+IOU_THRESHOLD = 0.45
+NUM_CLASSES = 4  # 사용하는 모델의 클래스 수에 맞게 조정 (예: COCO는 80)
+
+### --- 2. .pt 모델 로드 및 임시 ONNX 파일로 변환 ---
+print(f"'{PT_FILE}' 파일을 로드하여 ONNX로 변환합니다...")
+model = YOLO(PT_FILE)
+
+# torch.onnx.export는 순수 nn.Module이 필요하므로 내부 PyTorch 모델을 가져옵니다.
+pytorch_model = model.model.eval()
+
+### --- 3. ONNX 변환을 위한 더미 입력(dummy input) 생성 ---
+# 입력 형태에 맞춰 더미 입력을 생성합니다. (배치크기=1, 채널=3, 높이=640, 너비=640)
+### 이 입력은 모델 구조를 추적(trace)하는 데 사용됩니다.
+dummy_input = torch.randn(1, 3, 640, 640)
+
+### --- 4. torch.onnx.export를 사용하여 ONNX로 변환 ---
+### dynamic_axes를 설정하여 0번 축(배치)을 가변 크기로 만듭니다.
+print("PyTorch 모델을 ONNX로 변환 중...")
+torch.onnx.export(
+    pytorch_model,
+    dummy_input,
+    TEMP_ONNX,
+    input_names=['images'],
+    output_names=['output0'], # YOLOv8의 출력은 보통 1개이므로 output0으로 지정
+    dynamic_axes={
+        'images': {0: 'batch_size'},  # 입력의 0번 축 (배치)
+        'output0': {0: 'batch_size'} # 출력의 0번 축 (배치)
+    },
+    opset_version=12
+)
+print(f"ONNX 모델 저장 완료: {TEMP_ONNX}")
+
+print("ONNX 모델을 최적화(simplify)하는 중...")
+onnx_model = onnx.load(TEMP_ONNX)
+model_simplified, check = simplify(onnx_model)
+assert check, "ONNX 모델 최적화에 실패했습니다."
+onnx.save(model_simplified, SIMPLE_ONNX)
+print(f"최적화된 ONNX 모델 저장 완료: {SIMPLE_ONNX}")
+
+### --- 5. ONNX GraphSurgeon으로 NMS 플러그인 추가 ---
+
+### int64 타입의 ONNX Constant 노드를 생성하는 헬퍼 함수
+def C(name, vals):
+    return gs.Constant(name=name, values=np.asarray(vals, dtype=np.int64))
+
+print(f"'{TEMP_ONNX}' 파일을 로드하여 GraphSurgeon 작업을 시작합니다...")
+graph = gs.import_onnx(onnx.load(SIMPLE_ONNX))
+
+### 입력/출력 노드 가져오기
+inp = graph.inputs[0]
+raw_output = graph.outputs[0]
+batch_dim_symbol = inp.shape[0] # ultralytics가 지정한 동적 배치 심볼 (예: 'batch')
+
+### 모델의 원시 출력을 NMS 입력에 맞게 전처리 (Transpose, Slice)
+transposed_output = gs.Variable(name="transposed_predictions", dtype=np.float32)
+graph.nodes.append(gs.Node(op="Transpose", inputs=[raw_output], outputs=[transposed_output], attrs={"perm":[0, 2, 1]}))
+
+boxes = gs.Variable(name="boxes", dtype=np.float32)
+scores = gs.Variable(name="scores", dtype=np.float32)
+graph.nodes.append(gs.Node(
+    op="Slice",
+    inputs=[transposed_output, C("slice_boxes_starts", [0]), C("slice_boxes_ends", [4]), C("slice_boxes_axes", [2])],
+    outputs=[boxes]
+))
+graph.nodes.append(gs.Node(
+    op="Slice",
+    inputs=[transposed_output, C("slice_scores_starts", [4]), C("slice_scores_ends", [4 + NUM_CLASSES]), C("slice_scores_axes", [2])],
+    outputs=[scores]
+))
+print("모델의 원시 출력을 boxes와 scores로 분리했습니다.")
+
+### EfficientNMS_TRT 플러그인 노드 생성 및 연결
+num_dets    = gs.Variable("num_dets",    dtype=np.int32,   shape=[batch_dim_symbol, 1])
+nms_boxes   = gs.Variable("nms_boxes",   dtype=np.float32, shape=[batch_dim_symbol, MAX_OUTPUT_BOXES, 4])
+nms_scores  = gs.Variable("nms_scores",  dtype=np.float32, shape=[batch_dim_symbol, MAX_OUTPUT_BOXES])
+nms_classes = gs.Variable("nms_classes", dtype=np.int32,   shape=[batch_dim_symbol, MAX_OUTPUT_BOXES])
+
+nms_node = gs.Node(
+    op="EfficientNMS_TRT",
+    name="EfficientNMS",
+    domain="ai.onnx.contrib",
+    inputs=[boxes, scores],
+    outputs=[num_dets, nms_boxes, nms_scores, nms_classes],
+    attrs={
+        "plugin_version": "1", "background_class": -1, "max_output_boxes": MAX_OUTPUT_BOXES,
+        "score_threshold": SCORE_THRESHOLD, "iou_threshold": IOU_THRESHOLD, "box_coding": 1,
+        "score_activation": False, "class_agnostic": False,
+    }
+)
+graph.nodes.append(nms_node)
+print("EfficientNMS_TRT 플러그인 노드를 그래프에 추가했습니다.")
+
+### 그래프의 최종 출력을 NMS 출력으로 교체하고 정리
+graph.outputs = [num_dets, nms_boxes, nms_scores, nms_classes]
+graph.cleanup().toposort()
+
+### --- 4. 최종 ONNX 파일 저장 및 임시 파일 삭제 ---
+onnx_model = gs.export_onnx(graph)
+onnx.save(onnx_model, FINAL_ONNX)
+print(f"✅ 작업 완료! 최종 모델이 '{FINAL_ONNX}' 파일로 저장되었습니다.")
+
+### 임시 파일 삭제
+os.remove(TEMP_ONNX)
+print(f"임시 파일 '{TEMP_ONNX}'을 삭제했습니다.")
+
+os.remove(SIMPLE_ONNX)
+print(f"중간과정에서 최적화된 임시 ONNX 파일 '{SIMPLE_ONNX}'을 삭제했습니다.")
+
+### 핵심 기능 요약
+
+YOLOv8 모델 로드 및 ONNX 변환:
+
+ultralytics 라이브러리를 사용해 .pt 파일을 로드합니다.
+
+ torch.onnx.export를 이용해 모델을 표준 ONNX 형식으로 변환하며, 이때  배치 크기 축을 동적(batch_size) 으로 설정하여 다양한 배치 크기로 추론할 수 있게 만듭니다.
+
+ONNX 모델 최적화 (simplify):
+
+onnx-simplifier 라이브러리를 사용해 변환된 ONNX 모델에서 불필요한 연산이나 중복 노드를 제거합니다.
+
+이 과정은 모델의 파일 크기를 줄이고 추론 속도를 향상시킵니다.
+
+EfficientNMS 플러그인 삽입:
+
+  onnx-graphsurgeon이라는 강력한 도구를 사용해 최적화된 ONNX 모델의 내부 그래프 구조를 직접 수정합니다.
+
+ 모델의 최종 출력단에 TensorRT 전용 EfficientNMS_TRT 플러그인 노드를 추가합니다. 이를 통해 스코어 필터링, IOU(Intersection over Union) 계산, 박스 선택 등 복잡한 후처리 과정이 모델 내부에 포함됩니다.
+
+ 최종 파일 생성 및 정리:
+
+ 모든 수정이 완료된 그래프를 최종 ONNX 파일(model_with_nms.onnx)로 저장합니다.
+
+ 변환 과정에서 생성된 모든 임시 파일들을 자동으로 삭제하여 최종 결과물만 남깁니다.
+
+결론적으로, 이 스크립트는 TensorRT 환경에서 YOLOv8 모델을 최고 성능으로 실행하기 위한 맞춤형 ONNX 파일을 한 번에 생성해주는 매우 유용한 도구이다.
+
+
+
+
+
+
 
 
 
