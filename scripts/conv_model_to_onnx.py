@@ -52,7 +52,8 @@ model_name = 'osnet_x1_0'
 # Load the OSNet model
 model = torchreid.models.build_model(name=model_name, num_classes=512)
 #torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\resnet18_128x64__market1501_softmax\model\model.pth.tar-40')
-torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\osnet_x1_0_veri_softmax\model\\model.pth.tar-50')
+#torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\osnet_x1_0_veri_softmax\model\\model.pth.tar-50')
+torchreid.utils.load_pretrained_weights(model, r'D:\SPB_Data\deep-person-reid\log\osnet_x1_0_veri_softmax\model_vReg\\model.pth.tar-45')
 
 
 # Custom Model 생성 (Global Average Pooling을 Average Pooling으로 교체하고 추가 연산 적용)
@@ -69,7 +70,7 @@ dummy_input = torch.randn(1, 3, 256,256)
 #torch.onnx.export(model, dummy_input, 'feature.onnx', export_params=True, opset_version=11)
 # Export the model to ONNX with input and output names
 
-onnx_output_path = 'feature.onnx'
+onnx_output_path = 'feature_vReg.onnx'
 torch.onnx.export(
     model,                   # 모델 객체
     dummy_input,             # 더미 입력 데이터

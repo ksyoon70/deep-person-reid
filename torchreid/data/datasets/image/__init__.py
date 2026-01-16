@@ -14,3 +14,6 @@ from .market1501 import Market1501
 from .dukemtmcreid import DukeMTMCreID
 from .university1652 import University1652
 from .veri import VeRi
+from .hReg import hReg
+from .vReg import vReg
+from .oReg import oReg

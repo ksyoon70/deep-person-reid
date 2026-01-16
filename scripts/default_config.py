@@ -176,6 +176,36 @@ def veri_imagedata_kwargs(cfg):
         'output_usage': cfg.veri.output_usage  # feature or mixture
     }
 
+def ocr_imagedata_kwargs(cfg):
+    return {
+        'root': cfg.data.root,
+        'sources': cfg.data.sources,
+        'targets': cfg.data.targets,
+        'height': cfg.data.height,
+        'width': cfg.data.width,
+        'transforms': cfg.data.transforms,
+        'k_tfm': cfg.data.k_tfm,
+        'norm_mean': cfg.data.norm_mean,
+        'norm_std': cfg.data.norm_std,
+        'use_gpu': cfg.use_gpu,
+        'split_id': cfg.data.split_id,
+        'combineall': cfg.data.combineall,
+        'load_train_targets': cfg.data.load_train_targets,
+        'batch_size_train': cfg.train.batch_size,
+        'batch_size_test': cfg.test.batch_size,
+        'workers': cfg.data.workers,
+        'num_instances': cfg.sampler.num_instances,
+        'num_cams': cfg.sampler.num_cams,
+        'num_datasets': cfg.sampler.num_datasets,
+        'train_sampler': cfg.sampler.train_sampler,
+        'train_sampler_t': cfg.sampler.train_sampler_t,
+        # image dataset specific
+        'cuhk03_labeled': cfg.cuhk03.labeled_images,
+        'cuhk03_classic_split': cfg.cuhk03.classic_split,
+        'market1501_500k': cfg.market1501.use_500k_distractors,
+        'output_usage': cfg.veri.output_usage  # feature or mixture
+    }
+
 def videodata_kwargs(cfg):
     return {
         'root': cfg.data.root,

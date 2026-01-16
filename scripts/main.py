@@ -13,7 +13,7 @@ from torchreid.utils import (
 
 from default_config import (
     imagedata_kwargs, optimizer_kwargs, videodata_kwargs, engine_run_kwargs,
-    get_default_config, lr_scheduler_kwargs, veri_imagedata_kwargs
+    get_default_config, lr_scheduler_kwargs, veri_imagedata_kwargs,ocr_imagedata_kwargs
 )
 from collections import OrderedDict
 
@@ -21,6 +21,8 @@ def build_datamanager(cfg):
     if cfg.data.type == 'image':
         if cfg.data.root == 'VeRi':
             return torchreid.data.VehicleImageDataManager(**veri_imagedata_kwargs(cfg))
+        elif cfg.data.root == 'Ocr' :
+            return torchreid.data.OcrImageDataManager(**ocr_imagedata_kwargs(cfg))
         else:
             return torchreid.data.ImageDataManager(**imagedata_kwargs(cfg))
     else:

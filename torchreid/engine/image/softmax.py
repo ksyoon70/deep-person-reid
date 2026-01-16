@@ -1,7 +1,7 @@
 from __future__ import division, print_function, absolute_import
 
 from torchreid import metrics
-from torchreid.losses import CrossEntropyLoss
+from torchreid.losses import CrossEntropyLoss, ArcFaceLoss
 
 from ..engine import Engine
 
@@ -77,6 +77,29 @@ class ImageSoftmaxEngine(Engine):
             label_smooth=label_smooth
         )
 
+        self.use_arcface = False
+        if self.datamanager.targets[0] in ['hReg', 'vReg', 'oReg']:
+            print("=> Using ArcFace for target: {}".format(self.datamanager.targets[0]))
+            self.use_arcface = True
+            # Assuming model has feature_dim attribute or generally known dimension
+            if hasattr(self.model, 'module'):
+                self.feature_dim = self.model.module.feature_dim
+                # Set loss to triplet to imply return of features
+                self.model.module.loss = 'triplet' 
+            else:
+                self.feature_dim = self.model.feature_dim
+                self.model.loss = 'triplet'
+            
+            self.arcface_layer = ArcFaceLoss(
+                num_classes=self.datamanager.num_train_pids,
+                feat_dim=self.feature_dim
+            )
+            if self.use_gpu:
+                self.arcface_layer = self.arcface_layer.cuda()
+            
+            # Add arcface parameters to optimizer
+            self.optimizer.add_param_group({'params': self.arcface_layer.parameters()})
+
     def forward_backward(self, data):
         if self.datamanager.targets[0] == 'veri':
             imgs, pids,colors, typeids = self.parse_data_for_train(data)
@@ -134,6 +157,15 @@ class ImageSoftmaxEngine(Engine):
             else:
                 loss_pid = self.compute_loss(self.criterion, output['pid'], pids)
                 loss = loss_pid # pid만 사용하는 경우
+        elif self.use_arcface:
+            # outputs is expected to be (y, v) because we set loss='triplet'
+            # y: initial classifier logits (ignored here or not produced if architecture differs)
+            # v: features
+            _, features = outputs
+            # Pass features to ArcFaceLayer
+            arcface_logits = self.arcface_layer(features, pids)
+            loss = self.compute_loss(self.criterion, arcface_logits, pids)
+            outputs = arcface_logits # update outputs for accuracy calculation
         else:
             loss = self.compute_loss(self.criterion, outputs, pids)
 

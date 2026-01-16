@@ -198,7 +198,7 @@ class Engine(object):
         self.max_epoch = max_epoch
         print('=> Start training')
 
-        rank_acc = 0.95  # 예시로 Rank-1 정확도가 95%를 초과하면 훈련을 중단
+        rank_acc = 0.999  # 예시로 Rank-1 정확도가 95%를 초과하면 훈련을 중단
 
         for self.epoch in range(self.start_epoch, self.max_epoch):
             self.train(
@@ -421,9 +421,7 @@ class Engine(object):
             qf = F.normalize(qf, p=2, dim=1)
             gf = F.normalize(gf, p=2, dim=1)
 
-        print(
-            'Computing distance matrix with metric={} ...'.format(dist_metric)
-        )
+        print('Computing distance matrix with metric={} ...'.format(dist_metric))
         distmat = metrics.compute_distance_matrix(qf, gf, dist_metric)
         distmat = distmat.numpy()
 
@@ -432,6 +430,12 @@ class Engine(object):
             distmat_qq = metrics.compute_distance_matrix(qf, qf, dist_metric)
             distmat_gg = metrics.compute_distance_matrix(gf, gf, dist_metric)
             distmat = re_ranking(distmat, distmat_qq, distmat_gg)
+
+        # Check for single camera case
+        unique_cams = np.unique(np.concatenate((q_camids, g_camids)))
+        if len(unique_cams) == 1:
+            print("WARNING: Single camera detected. Modifying gallery camera IDs to enable intra-camera evaluation.")
+            g_camids += 1
 
         print('Computing CMC and mAP ...')
         cmc, mAP = metrics.evaluate_rank(

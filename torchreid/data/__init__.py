@@ -6,3 +6,4 @@ from .datasets import (
 )
 from .datamanager import ImageDataManager, VideoDataManager
 from .vehicle_datamanager import VehicleImageDataManager
+from .ocr_datamanager import OcrImageDataManager
